@@ -1,0 +1,7 @@
+interface:
+  display_name: "Figma Content Auditor"
+  short_description: "Audit Figma copy and draft rewrites."
+  default_prompt: "Use $figma-content-pattern-auditor to review linked Figma copy against the content checklist and return a markdown report with suggested rewrites and edit links."
+
+policy:
+  allow_implicit_invocation: true

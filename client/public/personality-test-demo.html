@@ -1,0 +1,1925 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>人格测试生成器 Demo</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;700&display=swap");
+
+      :root {
+        --bg: #f7f1e6;
+        --bg-soft: #fbf7ef;
+        --panel: rgba(255, 251, 243, 0.86);
+        --panel-strong: rgba(255, 248, 235, 0.98);
+        --line: rgba(102, 77, 53, 0.14);
+        --text: #34251a;
+        --muted: #7d6652;
+        --accent: #d76b37;
+        --accent-deep: #a94b1d;
+        --accent-soft: #ffe2d2;
+        --green: #456d59;
+        --green-soft: #dfeee7;
+        --gold: #c49b47;
+        --shadow: 0 24px 60px rgba(97, 66, 37, 0.12);
+        --radius-xl: 28px;
+        --radius-lg: 20px;
+        --radius-md: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Outfit", "PingFang SC", "Helvetica Neue", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(255, 213, 185, 0.68), transparent 32%),
+          radial-gradient(circle at 90% 12%, rgba(196, 155, 71, 0.18), transparent 22%),
+          linear-gradient(180deg, #f8f2e9 0%, #f4ede2 52%, #efe4d6 100%);
+        min-height: 100vh;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+        background-size: 28px 28px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.18), transparent 90%);
+      }
+
+      .page {
+        width: min(1200px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 72px;
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        padding: 28px;
+        border-radius: 32px;
+        background:
+          linear-gradient(135deg, rgba(255, 249, 238, 0.95), rgba(255, 244, 225, 0.86)),
+          linear-gradient(120deg, rgba(215, 107, 55, 0.08), transparent 50%);
+        border: 1px solid rgba(157, 113, 63, 0.16);
+        box-shadow: var(--shadow);
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        width: 320px;
+        height: 320px;
+        right: -72px;
+        top: -72px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(215, 107, 55, 0.16) 0%, rgba(215, 107, 55, 0) 72%);
+      }
+
+      .hero-grid {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 1.4fr 0.9fr;
+        gap: 22px;
+        align-items: start;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(157, 113, 63, 0.14);
+        color: var(--accent-deep);
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+      }
+
+      h1 {
+        margin-top: 18px;
+        font-family: "Noto Serif SC", serif;
+        font-size: clamp(34px, 5vw, 58px);
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+      }
+
+      .hero p {
+        margin: 18px 0 0;
+        max-width: 720px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.72;
+      }
+
+      .hero-note {
+        padding: 18px 18px 16px;
+        border-radius: 24px;
+        background: rgba(255, 252, 246, 0.92);
+        border: 1px solid rgba(157, 113, 63, 0.14);
+      }
+
+      .hero-note h3 {
+        font-size: 18px;
+        margin-bottom: 10px;
+      }
+
+      .hero-note ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.75;
+      }
+
+      .strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .mini {
+        padding: 14px 16px;
+        background: rgba(255, 255, 255, 0.72);
+        border-radius: 18px;
+        border: 1px solid rgba(157, 113, 63, 0.12);
+      }
+
+      .mini strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 18px;
+      }
+
+      .mini span {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 0.96fr 1.04fr;
+        gap: 22px;
+        margin-top: 24px;
+        align-items: start;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        padding: 24px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(14px);
+      }
+
+      .panel h2 {
+        font-family: "Noto Serif SC", serif;
+        font-size: 28px;
+        margin-bottom: 10px;
+      }
+
+      .panel .sub {
+        margin: 0 0 22px;
+        color: var(--muted);
+        line-height: 1.68;
+      }
+
+      .section-title {
+        margin: 26px 0 12px;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent-deep);
+      }
+
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .option-card {
+        position: relative;
+        padding: 16px;
+        border-radius: var(--radius-lg);
+        border: 1px solid rgba(102, 77, 53, 0.12);
+        background: rgba(255, 255, 255, 0.62);
+        cursor: pointer;
+        transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      }
+
+      .option-card:hover,
+      .chip:hover,
+      .result-pill:hover {
+        transform: translateY(-2px);
+      }
+
+      .option-card.active {
+        border-color: rgba(215, 107, 55, 0.55);
+        box-shadow: 0 12px 28px rgba(215, 107, 55, 0.12);
+        background: linear-gradient(180deg, rgba(255, 245, 238, 0.95), rgba(255, 250, 245, 0.92));
+      }
+
+      .option-card strong {
+        display: block;
+        font-size: 16px;
+      }
+
+      .option-card span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .chip,
+      .result-pill,
+      .score-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(102, 77, 53, 0.12);
+        background: rgba(255, 255, 255, 0.72);
+        cursor: pointer;
+        transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+      }
+
+      .chip.active,
+      .result-pill.active {
+        border-color: rgba(69, 109, 89, 0.44);
+        background: var(--green-soft);
+        color: #214332;
+      }
+
+      .field-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .field label {
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid rgba(102, 77, 53, 0.14);
+        border-radius: 14px;
+        padding: 13px 14px;
+        font: inherit;
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.78);
+        outline: none;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: rgba(215, 107, 55, 0.45);
+        box-shadow: 0 0 0 4px rgba(215, 107, 55, 0.08);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      button {
+        border: none;
+        border-radius: 16px;
+        padding: 13px 18px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button.primary {
+        color: #fff8f0;
+        background: linear-gradient(135deg, #d76b37, #bb5123);
+        box-shadow: 0 14px 28px rgba(187, 81, 35, 0.22);
+      }
+
+      button.secondary {
+        color: var(--green);
+        background: rgba(69, 109, 89, 0.09);
+        border: 1px solid rgba(69, 109, 89, 0.2);
+      }
+
+      button.ghost {
+        color: var(--accent-deep);
+        background: rgba(215, 107, 55, 0.08);
+        border: 1px solid rgba(215, 107, 55, 0.12);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .preview-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .system-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.76);
+        border: 1px solid rgba(102, 77, 53, 0.12);
+        color: var(--accent-deep);
+      }
+
+      .title-wrap {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+      }
+
+      .title-wrap h2 {
+        line-height: 1.24;
+      }
+
+      .type-list,
+      .question-list,
+      .answer-list {
+        display: grid;
+        gap: 14px;
+      }
+
+      .type-card,
+      .question-card,
+      .result-card,
+      .share-card {
+        background: var(--panel-strong);
+        border: 1px solid rgba(102, 77, 53, 0.12);
+        border-radius: 22px;
+        padding: 18px;
+      }
+
+      .type-card {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .type-card::before {
+        content: "";
+        position: absolute;
+        inset: auto auto -34px -18px;
+        width: 140px;
+        height: 140px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(215, 107, 55, 0.1), transparent 70%);
+      }
+
+      .type-card h3,
+      .result-card h3 {
+        margin-bottom: 8px;
+        font-size: 22px;
+      }
+
+      .type-card p,
+      .question-card p,
+      .share-card p,
+      .result-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 12px 0 14px;
+      }
+
+      .meta-row span {
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: rgba(255, 243, 234, 0.92);
+        color: var(--accent-deep);
+        font-size: 13px;
+      }
+
+      .share-link {
+        margin-top: 14px;
+        padding: 14px;
+        border-radius: 16px;
+        font-size: 14px;
+        word-break: break-all;
+        background: #fff7ee;
+        border: 1px dashed rgba(102, 77, 53, 0.18);
+      }
+
+      .question-card {
+        display: grid;
+        gap: 14px;
+      }
+
+      .question-head {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+
+      .question-index {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: rgba(215, 107, 55, 0.12);
+        color: var(--accent-deep);
+        font-weight: 700;
+      }
+
+      .likert {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .scale {
+        border-radius: 16px;
+        border: 1px solid rgba(102, 77, 53, 0.12);
+        padding: 12px 10px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.76);
+        cursor: pointer;
+        transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+      }
+
+      .scale:hover {
+        transform: translateY(-1px);
+      }
+
+      .scale.active {
+        background: rgba(69, 109, 89, 0.12);
+        border-color: rgba(69, 109, 89, 0.34);
+        color: #214332;
+      }
+
+      .scale strong {
+        display: block;
+        font-size: 16px;
+      }
+
+      .scale span {
+        display: block;
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .result-hero {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 18px;
+      }
+
+      .result-main {
+        padding: 22px;
+        border-radius: 24px;
+        background: linear-gradient(145deg, #fff6ec, #fffdf8);
+        border: 1px solid rgba(102, 77, 53, 0.12);
+      }
+
+      .result-main h3 {
+        font-family: "Noto Serif SC", serif;
+        font-size: 32px;
+      }
+
+      .result-main .tagline {
+        margin-top: 10px;
+        color: var(--accent-deep);
+        font-weight: 600;
+      }
+
+      .score-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .score-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .score-row header {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 14px;
+      }
+
+      .bar {
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(102, 77, 53, 0.08);
+        overflow: hidden;
+      }
+
+      .bar i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #d76b37, #e2a253);
+      }
+
+      .answer-list {
+        margin-top: 16px;
+      }
+
+      .answer-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .helper {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .floating-tip {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(255, 241, 227, 0.92);
+        border: 1px solid rgba(215, 107, 55, 0.14);
+        color: var(--accent-deep);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 980px) {
+        .hero-grid,
+        .grid,
+        .result-hero,
+        .answer-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .strip,
+        .field-row,
+        .card-grid,
+        .likert {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .page {
+          width: min(100% - 20px, 100%);
+          padding-top: 20px;
+        }
+
+        .hero,
+        .panel {
+          padding: 18px;
+          border-radius: 22px;
+        }
+
+        h1 {
+          font-size: 34px;
+        }
+
+        .strip,
+        .field-row,
+        .card-grid,
+        .likert {
+          grid-template-columns: 1fr;
+        }
+
+        .actions button {
+          width: 100%;
+        }
+
+        .title-wrap {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">Personality Test Builder Demo</div>
+            <h1>把心理流派和兴趣方向，变成可以转发的专属测试。</h1>
+            <p>
+              这个 Demo 会模拟完整链路：创建者先选心理流派和主题方向，系统即时生成一套人格体系、题目和分享链接；二级用户打开链接后完成测试，拿到一份类似 MBTI 风格、但内容和主题方向强绑定的解释结果。
+            </p>
+            <div class="strip">
+              <div class="mini">
+                <strong>5 种流派</strong>
+                <span>更偏职场和协作场景</span>
+              </div>
+              <div class="mini">
+                <strong>8 个方向</strong>
+                <span>桌游、女性主义、哲学、猫狗等</span>
+              </div>
+              <div class="mini">
+                <strong>本地生成</strong>
+                <span>先验证交互和结果体验</span>
+              </div>
+              <div class="mini">
+                <strong>可分享链接</strong>
+                <span>不依赖后端也能跑流程</span>
+              </div>
+            </div>
+          </div>
+          <aside class="hero-note">
+            <h3>首版建议原则</h3>
+            <ul>
+              <li>把结果定位为沟通风格和协作倾向，而不是诊断。</li>
+              <li>像 MBTI 一样有类型感，但解释更贴近你选择的主题。</li>
+              <li>先用 URL 分享做 Demo，确认体验后再上数据库和短链。</li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <section class="grid">
+        <section class="panel">
+          <h2>创建你的测试</h2>
+          <p class="sub">
+            先选一个心理流派，再叠加 1 到多个方向。你也可以输入自己的主题词，让解释结果带上你想要的世界观。
+          </p>
+
+          <div class="section-title">心理流派</div>
+          <div id="schoolGrid" class="card-grid"></div>
+
+          <div class="section-title">方向主题</div>
+          <div id="directionGrid" class="chip-row"></div>
+
+          <div class="section-title">自定义方向</div>
+          <div class="field">
+            <label for="customDirection">输入你自己的关键词，多个方向可用中文逗号分隔</label>
+            <input id="customDirection" type="text" placeholder="比如：播客、剧本杀、品牌咨询" />
+          </div>
+
+          <div class="section-title">生成参数</div>
+          <div class="field-row">
+            <div class="field">
+              <label for="typeCount">人格类型数量</label>
+              <select id="typeCount">
+                <option value="4">4 种</option>
+                <option value="6">6 种</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="questionCount">题目数量</label>
+              <select id="questionCount">
+                <option value="8">8 题</option>
+                <option value="12" selected>12 题</option>
+                <option value="16">16 题</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="generateBtn" class="primary">生成完整 Demo</button>
+            <button id="resetBtn" class="secondary" type="button">恢复推荐配置</button>
+          </div>
+
+          <div class="floating-tip">
+            推荐首发组合：`ACT × 职场协作`、`荣格原型 × 桌游`、`系统式视角 × 女性主义`、`积极心理学 × 狗狗`。
+          </div>
+        </section>
+
+        <section class="panel preview-shell">
+          <div class="title-wrap">
+            <div>
+              <div class="system-badge" id="systemBadge">未生成测试</div>
+              <h2 id="systemTitle">等待你生成第一套人格体系</h2>
+              <p class="sub" id="systemIntro">生成后这里会出现类型预览、测试题示例以及可直接分享给二级用户的链接。</p>
+            </div>
+          </div>
+
+          <section class="share-card hidden" id="shareSection">
+            <h3>分享链接</h3>
+            <p>这个链接会携带当前测试配置。二级用户打开后会直接进入答题页。</p>
+            <div class="share-link" id="shareLink"></div>
+            <div class="actions">
+              <button id="copyBtn" class="ghost" type="button">复制链接</button>
+              <button id="openBtn" class="secondary" type="button">在当前页面进入答题模式</button>
+            </div>
+          </section>
+
+          <section>
+            <div class="section-title">人格体系预览</div>
+            <div id="typeList" class="type-list"></div>
+          </section>
+
+          <section>
+            <div class="section-title">测试题预览</div>
+            <div id="questionPreview" class="question-list"></div>
+          </section>
+        </section>
+      </section>
+
+      <section class="panel hidden" id="testPanel" style="margin-top: 22px;">
+        <div class="title-wrap">
+          <div>
+            <div class="system-badge">二级用户答题页</div>
+            <h2 id="testTitle">完成测试，查看你的主题人格结果</h2>
+            <p class="sub" id="testIntro"></p>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="participantName">你的名字或昵称</label>
+            <input id="participantName" type="text" placeholder="比如：Anny、Momo、Sage" />
+          </div>
+          <div class="field">
+            <label>答题说明</label>
+            <div class="helper">按照“像不像你”的程度打分，1 分表示很不像，5 分表示非常像。</div>
+          </div>
+        </div>
+
+        <div id="answerList" class="answer-list"></div>
+        <div class="actions">
+          <button id="resultBtn" class="primary" type="button">查看我的结果</button>
+        </div>
+      </section>
+
+      <section class="panel hidden" id="resultPanel" style="margin-top: 22px;">
+        <div class="title-wrap">
+          <div>
+            <div class="system-badge">结果页</div>
+            <h2>你的主题人格画像</h2>
+            <p class="sub" id="resultSummary"></p>
+          </div>
+        </div>
+
+        <div class="result-hero">
+          <div class="result-main">
+            <div class="meta-row" id="resultMeta"></div>
+            <h3 id="resultName">等待结果</h3>
+            <div class="tagline" id="resultTagline"></div>
+            <p id="resultDesc" style="margin-top: 12px;"></p>
+            <div class="meta-row" id="resultTraits"></div>
+          </div>
+          <div class="result-card">
+            <h3>人格得分分布</h3>
+            <div id="scoreGrid" class="score-grid"></div>
+            <div class="helper">结果采用演示版算法：按题目选择累加各类型得分，展示主类型和次高类型。</div>
+          </div>
+        </div>
+
+        <div class="answer-grid" style="margin-top: 18px;">
+          <div class="result-card">
+            <h3>在这个主题里的你</h3>
+            <p id="resultLens"></p>
+          </div>
+          <div class="result-card">
+            <h3>适合你的协作方式</h3>
+            <p id="resultAdvice"></p>
+          </div>
+        </div>
+
+        <div class="answer-grid" style="margin-top: 14px;">
+          <div class="result-card">
+            <h3>压力下的盲点</h3>
+            <p id="resultRisk"></p>
+          </div>
+          <div class="result-card">
+            <h3>次人格提示</h3>
+            <p id="runnerUp"></p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const schools = [
+        {
+          id: "act",
+          label: "ACT 接纳承诺",
+          short: "ACT",
+          pitch: "适合做价值观、边界感和行动方式测试，尤其适合职场和成长语境。",
+          tone: "强调价值取向与心理灵活性",
+          systemWord: "价值行动人格谱",
+          archetypes: [
+            {
+              name: "罗盘行动者",
+              tagline: "一旦认准方向，就会把价值感落到行动里。",
+              core: "看重方向清晰、行动一致和持续推进。",
+              lens: "在主题场景里，你像一个先确定意义再动手的人，不想把精力耗在无谓噪音里。",
+              advice: "如果团队给你明确目标和可见进度，你会非常稳定；模糊目标下则适合先用自己的方式搭一个最小行动路径。",
+              risk: "当外界过于混乱时，你可能会把“先行动”升级成“只能按我的方向推进”。",
+              traits: ["方向感强", "行动一致", "能稳步推进"],
+              prompts: [
+                "先确认什么最重要，再开始投入。",
+                "把抽象想法转成清晰的行动步骤。",
+                "即使情绪复杂，也愿意朝认定的方向继续走。 "
+              ]
+            },
+            {
+              name: "留白观察者",
+              tagline: "先看清局面，再给出不被情绪裹挟的判断。",
+              core: "擅长拉开距离、整理感受，再作决定。",
+              lens: "你通常不是最先跳出来的人，但很容易看出情境里真正值得被注意的线索。",
+              advice: "你适合担任校准者或观察位，帮团队降低误判；若被催着马上表态，会消耗你的优势。",
+              risk: "压力下可能退回旁观位置，错过出手时机。",
+              traits: ["观察细腻", "不急于表态", "判断有层次"],
+              prompts: [
+                "先观察氛围和关系，再决定怎么发言。",
+                "面对混乱时，给自己一点心理空间更能想清楚。",
+                "比起快速站队，我更想先弄明白发生了什么。 "
+              ]
+            },
+            {
+              name: "边界守护者",
+              tagline: "知道自己要保护什么，也知道什么不必接。",
+              core: "重视边界、节奏和可持续投入。",
+              lens: "在主题场景里，你最擅长建立秩序感，不轻易让重要的事被侵蚀掉。",
+              advice: "适合做规则、节奏或资源边界的守门人；和你合作的人越尊重边界，你越能稳定输出。",
+              risk: "当环境频繁越界时，你可能会显得过于强硬，甚至把弹性也一起挡在外面。",
+              traits: ["边界清楚", "节奏稳定", "抗打扰强"],
+              prompts: [
+                "对我来说，先保护重点和边界很重要。",
+                "如果一件事不断侵占节奏，我会主动设限。",
+                "我更愿意在可持续的强度里长期推进，而不是短期燃烧。 "
+              ]
+            },
+            {
+              name: "实验推进者",
+              tagline: "不怕试，小步快跑，用反馈修正方向。",
+              core: "用行动验证，不把未知神化。",
+              lens: "你在主题场景里常常是那个敢于先试一次的人，靠真实反馈而不是空想来判断对错。",
+              advice: "最适合探索期、试错期和需要打开新局面的团队；和你协作的人若能及时给反馈，会放大你的价值。",
+              risk: "压力之下可能因为想快速突破，而低估了关系维护和节奏管理。",
+              traits: ["试错意愿高", "反馈敏感", "启动速度快"],
+              prompts: [
+                "与其空想，不如先跑一个小实验看看。",
+                "我会根据真实反馈不断调方向。",
+                "面对陌生议题，我通常愿意先迈出第一步。 "
+              ]
+            },
+            {
+              name: "连接协调者",
+              tagline: "把差异放进同一张桌子上，让事情继续往前。",
+              core: "善于协调立场、感受与合作关系。",
+              lens: "你对人与人之间的张力很敏感，也知道怎么让彼此重新接上。",
+              advice: "适合做协作枢纽、讨论主持或多方协调位；清晰授权会让你的协调更加高效。",
+              risk: "如果太想维持和气，可能会延后真正需要面对的冲突。",
+              traits: ["能接人", "擅长缓冲", "重视关系"],
+              prompts: [
+                "我会主动帮助不同意见的人重新建立沟通。",
+                "一段合作是否能继续，往往取决于关系是否被照顾到。",
+                "遇到卡点时，我更倾向于先把人连接起来。 "
+              ]
+            },
+            {
+              name: "稳态修复者",
+              tagline: "擅长在波动之后，把系统慢慢调回健康状态。",
+              core: "关注恢复力、修复节奏和长期稳定。",
+              lens: "你在主题场景里不是最喧闹的那一个，却常常是把局面救回来的那一个。",
+              advice: "你适合处理复盘、修复、回稳与陪跑类工作；如果被迫长期高刺激运转，优势会被透支。",
+              risk: "压力大时可能更想守住已有秩序，而不愿冒必要的风险。",
+              traits: ["耐心修复", "韧性高", "适合长期局"],
+              prompts: [
+                "比起一直冲，我更擅长把局面慢慢修复到健康状态。",
+                "我的强项往往出现在波动之后的回稳阶段。",
+                "我会优先判断这件事能不能长期跑下去。 "
+              ]
+            }
+          ]
+        },
+        {
+          id: "positive",
+          label: "积极心理学",
+          short: "积极心理学",
+          pitch: "强调优势、韧性和资源感，适合做团队激励、成长和职场氛围测试。",
+          tone: "强调优势激发与韧性资源",
+          systemWord: "优势唤醒人格谱",
+          archetypes: [
+            {
+              name: "优势点亮者",
+              tagline: "总能先看到别人和事情里可被点亮的部分。",
+              core: "善于发现潜力并激活人的优势感。",
+              lens: "你在主题场景里像一个会发光的放大镜，总能捕捉可成长的可能性。",
+              advice: "适合带动士气、发掘亮点、做正向反馈；如果环境只有挑错没有建设，会让你迅速失去能量。",
+              risk: "可能因为太想看见希望，而低估结构性问题。",
+              traits: ["善于鼓励", "有资源感", "擅长放大优点"],
+              prompts: [
+                "我经常先注意到一件事里值得发展的部分。",
+                "我很自然会去鼓励别人把擅长的地方用出来。",
+                "当团队低气压时，我会想办法重新点亮大家。 "
+              ]
+            },
+            {
+              name: "韧性蓄能者",
+              tagline: "不靠吵闹感存在，而靠稳定回弹和长期能量。",
+              core: "重视恢复力、耐受力与稳健积累。",
+              lens: "你在主题场景里像一个储能装置，平时低调，但关键时刻能顶住。",
+              advice: "适合做长期项目、陪跑型合作和困难阶段的稳定器；若总被忽略你的恢复节奏，会消耗很大。",
+              risk: "可能把过度扛住误以为是成熟，从而压掉自己的真实疲惫。",
+              traits: ["稳", "扛压", "恢复力强"],
+              prompts: [
+                "我通常能在压力之后比较快找回自己的节奏。",
+                "比起爆发式表现，我更在意长期稳定地跑下去。",
+                "困难的时候，我会先守住能量而不是逞强。 "
+              ]
+            },
+            {
+              name: "愿景召集者",
+              tagline: "能把分散的人和资源，聚拢到一个值得相信的目标上。",
+              core: "擅长建立愿景、共识和希望感。",
+              lens: "你在主题场景里更像一个号角手，重要的是让大家愿意一起往前。",
+              advice: "适合做启动、动员、愿景表达和对外沟通；如果细节落地无人承接，你会比较容易空转。",
+              risk: "可能过于相信热情和信念，而忽略执行约束。",
+              traits: ["有感染力", "会讲愿景", "能聚人"],
+              prompts: [
+                "我很容易把大家重新拉回到为什么要做这件事。",
+                "当局面分散时，我会主动去建立共同目标。",
+                "我经常先从愿景和意义层面推动事情。 "
+              ]
+            },
+            {
+              name: "关系滋养者",
+              tagline: "让合作不只有效率，也有被理解和被看见的感觉。",
+              core: "重视情感滋养、安全感和长期关系。",
+              lens: "你在主题场景里像一块柔软但结实的连接层，让合作不至于只剩机制。",
+              advice: "适合照顾新成员、维护群体氛围和提升信任；和你合作的人越真诚，越能激发你的稳定价值。",
+              risk: "太习惯照顾别人时，容易忘记自己的需求。",
+              traits: ["共情强", "会照顾人", "提升安全感"],
+              prompts: [
+                "我会特别留意有没有人被忽略或被落下。",
+                "对我来说，合作的感受和关系质量也很重要。",
+                "当别人有压力时，我通常会先做情绪上的接住。 "
+              ]
+            },
+            {
+              name: "成就导航者",
+              tagline: "擅长把模糊目标拆成清晰可完成的里程碑。",
+              core: "重视进展感、可见成果和持续积累。",
+              lens: "你像一张看得见路径的地图，会自然地去定义阶段目标和推进节点。",
+              advice: "非常适合需要节奏、节点和里程碑的项目；如果环境只会反复变动目标，你会疲惫。",
+              risk: "压力大时可能为了追求结果而缩窄了探索空间。",
+              traits: ["目标清楚", "推进稳定", "重视结果"],
+              prompts: [
+                "我喜欢把大目标拆成一个个可完成的里程碑。",
+                "看到进展本身会让我更有动力。",
+                "我会自然地去想这件事下一步最关键的动作是什么。 "
+              ]
+            },
+            {
+              name: "氛围激活者",
+              tagline: "有能力把沉闷局面重新点燃，让人愿意参与。",
+              core: "通过能量、表达和参与感来激发行动。",
+              lens: "你在主题场景里像会点火的火柴，擅长让沉默重新流动起来。",
+              advice: "适合破冰、主持、创意讨论和需要调动参与感的场景；如果长期只能独处执行，优势会发挥不出来。",
+              risk: "可能为了维持热度而忽略深度或后续跟进。",
+              traits: ["有场域感", "会带气氛", "参与感强"],
+              prompts: [
+                "我会本能地想让现场更有参与感和流动感。",
+                "如果大家都不太说话，我通常会尝试把局面热起来。",
+                "我很享受把沉闷变成有活力的过程。 "
+              ]
+            }
+          ]
+        },
+        {
+          id: "cbt",
+          label: "认知行为取向",
+          short: "CBT",
+          pitch: "适合做决策风格、问题解决风格和压力反应模式测试。",
+          tone: "强调认知结构与问题解决方式",
+          systemWord: "决策路径人格谱",
+          archetypes: [
+            {
+              name: "证据分析者",
+              tagline: "先看事实和证据，再判断该怎么做。",
+              core: "偏好证据、逻辑与可验证信息。",
+              lens: "你在主题场景里会优先分辨什么是真的、什么只是投射或想象。",
+              advice: "适合梳理问题、搭模型、做判断底盘；如果被迫在没有事实基础时快速表态，你会不舒服。",
+              risk: "可能因为过度追求证据充分，而拖慢必要行动。",
+              traits: ["理性", "讲依据", "善于辨别"],
+              prompts: [
+                "我会先看事实依据，而不是先接受情绪化结论。",
+                "面对复杂情况，我更愿意先把信息分层整理。",
+                "没有足够证据时，我不太愿意仓促下判断。 "
+              ]
+            },
+            {
+              name: "方案拆解者",
+              tagline: "把大问题拆开，让事情重新变得可处理。",
+              core: "擅长结构化、拆解和分步骤推进。",
+              lens: "你在主题场景里像一个很会拆机器的人，复杂事一到你手里就会被切成可执行部件。",
+              advice: "适合做流程设计、方案拆解和复杂项目推进；如果团队只讲热情不讲结构，会让你抓不到着力点。",
+              risk: "过于拆解时，可能忽略人和气氛的非理性因素。",
+              traits: ["结构化", "拆解能力强", "执行清晰"],
+              prompts: [
+                "我擅长把复杂事情拆成一个个可执行部分。",
+                "面对模糊目标时，我会本能地整理步骤和顺序。",
+                "清晰结构会让我更有掌控感。 "
+              ]
+            },
+            {
+              name: "风险预判者",
+              tagline: "很早就能闻到问题苗头，提前补洞。",
+              core: "擅长识别风险、预判偏差和建立缓冲。",
+              lens: "在主题场景里，你像一个提前看见裂缝的人，总能在失控前拉一下手刹。",
+              advice: "适合做复盘、风控、上线前检查和长期维护；若环境讨厌提醒风险，你会很压抑。",
+              risk: "可能因预判太多，而显得悲观或不够放手。",
+              traits: ["警觉", "有前瞻性", "会补漏洞"],
+              prompts: [
+                "我会很早意识到哪里可能出问题。",
+                "在投入之前，我通常会先想失败点和应对方案。",
+                "我宁愿先补洞，也不想事后大修。 "
+              ]
+            },
+            {
+              name: "执行闭环者",
+              tagline: "一旦开始，就想把前后链路都收回来。",
+              core: "重视完成度、闭环和结果交付。",
+              lens: "你在主题场景里像一个会把开口都收紧的人，不太接受只开头不收尾。",
+              advice: "适合需要强执行、跟进和交付意识的场景；给你明确责任边界，你会非常可靠。",
+              risk: "容易因为太想收口，而不耐烦面对反复变化或开放探索。",
+              traits: ["交付感强", "跟进到位", "重视完成"],
+              prompts: [
+                "我会自然地去确认事情有没有真正落地。",
+                "比起开很多头，我更在意把事情收成闭环。",
+                "如果没有明确结果，我会一直觉得这件事没做完。 "
+              ]
+            },
+            {
+              name: "反馈修正者",
+              tagline: "不执着第一版正确，而是持续修正直到更合适。",
+              core: "重视迭代、反馈和修正能力。",
+              lens: "你在主题场景里像一个持续微调的人，愿意不断靠近更好的版本。",
+              advice: "适合产品迭代、教学反馈和实验式合作；如果环境把修正视为失败，你会施展不开。",
+              risk: "可能在不断优化中，延迟最后的定稿与决断。",
+              traits: ["会调参", "愿意修正", "成长导向"],
+              prompts: [
+                "我愿意根据反馈持续调整自己的做法。",
+                "对我来说，修正并不等于做错，而是更接近合适。",
+                "我很少迷信第一版答案。 "
+              ]
+            },
+            {
+              name: "节奏校准者",
+              tagline: "知道什么时候该快，什么时候该慢。",
+              core: "擅长判断节奏与资源分配。",
+              lens: "你在主题场景里不是最喧哗的，却很擅长帮一件事回到合适的速度。",
+              advice: "适合项目管理、流程校准和跨团队协作；如果环境长期失序，你会被迫扮演救火员。",
+              risk: "过度校准时可能压掉创造性的突发灵感。",
+              traits: ["节奏感强", "资源意识高", "适合调度"],
+              prompts: [
+                "我很在意一件事现在到底该快还是该慢。",
+                "我会自然留意资源是否被用在了对的地方。",
+                "当现场节奏失衡时，我会想把它拉回更合理的状态。 "
+              ]
+            }
+          ]
+        },
+        {
+          id: "systems",
+          label: "系统式视角",
+          short: "系统式",
+          pitch: "适合团队协作、组织角色和关系网络主题，特别适合职场产品。",
+          tone: "强调关系系统与角色位置",
+          systemWord: "协作网络人格谱",
+          archetypes: [
+            {
+              name: "接口协调者",
+              tagline: "能在不同人和不同系统之间建立通路。",
+              core: "擅长跨界沟通、翻译需求和维持合作接口。",
+              lens: "你像团队里的转接口，常常能让原本断开的信息流重新接上。",
+              advice: "适合跨团队、跨角色协作；清晰的上下文和授权会让你价值倍增。",
+              risk: "如果总是替别人对齐，可能最后只有你最累。",
+              traits: ["会翻译", "跨界顺滑", "连接型"],
+              prompts: [
+                "不同角色之间听不懂彼此时，我往往能帮忙翻译。",
+                "我会很在意合作接口是不是顺畅。",
+                "对我来说，让人能接上彼此比单点输出更重要。 "
+              ]
+            },
+            {
+              name: "结构编织者",
+              tagline: "擅长把散乱的资源组织成更稳固的结构。",
+              core: "重视结构、关系网和长线搭建。",
+              lens: "你在主题场景里像一位编织者，擅长把零散点慢慢织成可承重的网络。",
+              advice: "适合搭机制、定角色和建立合作秩序；频繁推翻结构会让你消耗很大。",
+              risk: "可能因为太重视结构，而不够包容临时性的变化。",
+              traits: ["结构感强", "会织网", "长期视角"],
+              prompts: [
+                "我会自然地想把散乱资源组织成更稳定的结构。",
+                "比起临时发挥，我更关注合作关系能否长期成立。",
+                "当局面混乱时，我会先找关键节点再重建结构。 "
+              ]
+            },
+            {
+              name: "张力转译者",
+              tagline: "能看见冲突背后的需求，并把张力转成可讨论内容。",
+              core: "擅长识别关系张力和背后需求。",
+              lens: "你不是单纯在熄火，而是在把情绪和冲突翻译回可以谈的语言。",
+              advice: "适合主持敏感议题、处理冲突、做组织对话；如果环境只想压冲突，你会被低估。",
+              risk: "太想理解每一方时，可能延迟立场与决策。",
+              traits: ["能处理冲突", "会听深层需求", "转译张力"],
+              prompts: [
+                "我通常会去理解冲突背后真正的需求是什么。",
+                "我比较能把对立情绪转成可讨论的内容。",
+                "当关系紧张时，我会注意到表面说法之外的东西。 "
+              ]
+            },
+            {
+              name: "节奏稳定者",
+              tagline: "在关系系统里守住节奏，让大家不至于一起失衡。",
+              core: "擅长稳态、照料系统负荷与维持节奏。",
+              lens: "你像系统里的稳定器，不一定最显眼，但对整体健康很关键。",
+              advice: "适合长期运营、团队管理和高压环境下的节奏稳定；如果总被迫临时救火，会透支你的耐心。",
+              risk: "可能太重视稳态，而对必要的突破保持保守。",
+              traits: ["稳系统", "重节奏", "耐受度高"],
+              prompts: [
+                "我会留意整个团队有没有开始失衡或过载。",
+                "我常常会主动调整节奏，避免事情一起失控。",
+                "对我来说，系统健康比短期冲刺更重要。 "
+              ]
+            },
+            {
+              name: "角色唤醒者",
+              tagline: "会自然看见谁可以承担什么，让位置更合适。",
+              core: "擅长识别人、角色与潜在职责。",
+              lens: "你在主题场景里像一位排兵布阵的人，擅长把人放到更合适的位置。",
+              advice: "适合组队、分工和新团队搭建；如果角色边界总是混乱，会让你很累。",
+              risk: "可能因为太快给别人定位，而忽略人的变化性。",
+              traits: ["会分工", "识别人位", "擅长组队"],
+              prompts: [
+                "我很快能感觉到谁更适合承担什么角色。",
+                "我会留意一个团队里的位置是不是合理。",
+                "对我来说，关系和分工是不是顺很关键。 "
+              ]
+            },
+            {
+              name: "回路修复者",
+              tagline: "系统出现断点时，擅长把流程和关系慢慢修回来。",
+              core: "重视修复、复盘和让系统恢复自我运转。",
+              lens: "你像一个修回路的人，擅长在断裂之后把连接重新焊起来。",
+              advice: "适合修补流程、修复关系和问题后治理；如果环境只爱开新局不做善后，你会受挫。",
+              risk: "可能会因为太投入修复，而迟迟不愿意放弃无效系统。",
+              traits: ["善后能力强", "会修流程", "耐心高"],
+              prompts: [
+                "当流程或关系断掉时，我会想办法把它修回去。",
+                "我对复盘和修补漏洞比很多人更有耐心。",
+                "一件事出了问题后，我会关心它如何恢复自我运转。 "
+              ]
+            }
+          ]
+        },
+        {
+          id: "jung",
+          label: "荣格原型 / 叙事",
+          short: "荣格原型",
+          pitch: "最适合做有故事感、有记忆点的人格结果页，也最接近 MBTI 的传播感。",
+          tone: "强调原型、角色感与叙事张力",
+          systemWord: "主题原型人格谱",
+          archetypes: [
+            {
+              name: "探索者",
+              tagline: "总在寻找新的路径、视角与未被命名的可能性。",
+              core: "被未知、远方和新鲜路径吸引。",
+              lens: "你在主题场景里不是为了重复熟悉路线，而是为了去发现新的地图。",
+              advice: "适合探索期、创意期和需要打开新空间的团队；如果被长期锁死在标准流程里，会快速失去活力。",
+              risk: "可能因为被新鲜感吸引，而忽略收尾和长期维护。",
+              traits: ["好奇", "会开新路", "不怕陌生"],
+              prompts: [
+                "我经常会被新的路径、规则或视角吸引。",
+                "熟悉做法让我安心，但未知更容易让我兴奋。",
+                "我喜欢从别人没怎么走过的角度理解一件事。 "
+              ]
+            },
+            {
+              name: "守望者",
+              tagline: "替重要的价值、规则和关系守住边界。",
+              core: "重视守护、稳定和长期可信赖。",
+              lens: "你像站在塔楼上的人，不一定总往前冲，但会确保重要的东西不被轻易丢掉。",
+              advice: "适合守规则、护关系、稳节奏和做底线判断；如果环境对边界过于轻慢，会让你疲惫。",
+              risk: "可能因为太想守住既有秩序，而对必要变化较慢热。",
+              traits: ["可靠", "守边界", "稳定"],
+              prompts: [
+                "我会自然想守住重要的规则、价值或关系。",
+                "当大家都急着往前时，我会留意有没有重要的东西被落下。",
+                "对我来说，可持续和可信赖很重要。 "
+              ]
+            },
+            {
+              name: "召集者",
+              tagline: "能让不同的人愿意进入同一个故事里行动。",
+              core: "擅长聚人、造势和建立共同叙事。",
+              lens: "你在主题场景里像一位发起人，能让人觉得“这件事值得一起去做”。",
+              advice: "适合动员、传播、主持和共同体建设；如果总要单独埋头完成细节，会比较消耗。",
+              risk: "可能为了维持共鸣而忽略具体执行难度。",
+              traits: ["有号召力", "会造共识", "擅长发起"],
+              prompts: [
+                "我很容易把大家拉回到同一个故事和目标里。",
+                "我喜欢把分散的人重新组织到一起。",
+                "当需要有人发起时，我通常不会躲开。 "
+              ]
+            },
+            {
+              name: "炼金者",
+              tagline: "能把看似不相干的元素，重新炼成新的意义。",
+              core: "擅长转化、重组和提出新解释。",
+              lens: "你像会做思想实验的人，喜欢把旧材料放进新容器，重新看待它们。",
+              advice: "适合洞察、创意重构、内容表达和跨界创新；如果环境只要标准答案，你会被压缩。",
+              risk: "可能沉迷于诠释和重构，而忘记现实约束。",
+              traits: ["会重构", "联想强", "解释力高"],
+              prompts: [
+                "我经常会把看似无关的元素联系到一起。",
+                "我喜欢重新解释一件事，而不是照着现成定义用。",
+                "很多时候，我先想到的是‘还能不能换个理解方式’。 "
+              ]
+            },
+            {
+              name: "织梦者",
+              tagline: "能感受到潜台词、氛围和还没有说出口的东西。",
+              core: "重视感受、象征和隐性信息。",
+              lens: "你在主题场景里像一个会读空气的人，擅长感知那些还没被说出来的部分。",
+              advice: "适合创意、叙事、品牌气质和关系敏感场景；若环境只认可显性指标，会让你被误读。",
+              risk: "可能把感受到的氛围看得太重，增加自己的内耗。",
+              traits: ["感受细", "会读氛围", "有象征感"],
+              prompts: [
+                "我经常会留意一件事没说出口的那部分。",
+                "场景氛围和潜台词会影响我对人的判断。",
+                "我对隐性的东西通常比对显性的东西更敏感。 "
+              ]
+            },
+            {
+              name: "破局者",
+              tagline: "当旧叙事已经不够用时，敢于把局重新掀开。",
+              core: "擅长打破惯性和推开新入口。",
+              lens: "你在主题场景里像一个开裂口的人，不满足于在旧逻辑里微调。",
+              advice: "适合转型期、重构期和需要撬动改变的局面；如果组织只允许顺从而不欢迎挑战，你会很难受。",
+              risk: "可能因为太想打破惯性，而让周围人缺少安全感。",
+              traits: ["敢破局", "推动改变", "不怕冲突"],
+              prompts: [
+                "当我感觉旧方法已经不够用时，会想主动换路。",
+                "我不太满足于只在旧逻辑里做小修小补。",
+                "如果一件事需要有人先掀桌重新看，我往往不太躲。 "
+              ]
+            }
+          ]
+        }
+      ];
+
+      const directionCatalog = [
+        {
+          id: "work",
+          label: "职场协作",
+          intro: "把人格结果翻译成团队协作、会议、推进和边界管理语境。",
+          context: "进入一个跨职能合作项目时",
+          challenge: "任务边界不清、目标还在变动时",
+          task: "和别人一起推进一项复杂工作",
+          analogy: "在团队协作现场",
+          flavor: "你在合作里呈现出来的方式"
+        },
+        {
+          id: "startup",
+          label: "创业团队",
+          intro: "更强调速度、资源稀缺、角色混合和共同创始感。",
+          context: "面对资源紧张的新项目时",
+          challenge: "事情多、资源少、节奏快的时候",
+          task: "和一小群人从零推进一件事",
+          analogy: "在创业气压里",
+          flavor: "你在高压创始场景中的样子"
+        },
+        {
+          id: "feminism",
+          label: "女性主义",
+          intro: "把人格解释和权力关系、边界意识、照料劳动与表达空间结合起来。",
+          context: "讨论一个涉及立场和权力关系的议题时",
+          challenge: "有人被忽略、被压低或边界被侵入时",
+          task: "在复杂关系里坚持价值并继续对话",
+          analogy: "在女性主义讨论与关系现场",
+          flavor: "你如何看待边界、位置与发声"
+        },
+        {
+          id: "philosophy",
+          label: "哲学流派",
+          intro: "把人格结果做成一种思想气质，更有观点性和自我叙事感。",
+          context: "读到一套新观念或世界解释模型时",
+          challenge: "不同价值逻辑发生冲突的时候",
+          task: "用一种观点去理解人与世界",
+          analogy: "在思想实验室里",
+          flavor: "你偏好的思考与立场路径"
+        },
+        {
+          id: "boardgame",
+          label: "桌游",
+          intro: "把人格结果包装成开局、判断、协商、算计和气氛管理风格。",
+          context: "坐上一局新桌游、规则刚刚展开时",
+          challenge: "局势变化快、他人策略难预料时",
+          task: "和不同风格玩家一起推进一局游戏",
+          analogy: "在桌游牌桌上",
+          flavor: "你在开局、合作和胜负感里的样子"
+        },
+        {
+          id: "cat",
+          label: "猫咪",
+          intro: "结果会更强调观察、边界、信任建立和微妙情绪读取。",
+          context: "来到一个陌生环境、需要重新建立安全感时",
+          challenge: "关系还没完全熟、边界需要试探的时候",
+          task: "在信任与独立之间找到舒服距离",
+          analogy: "像一只正在熟悉环境的猫",
+          flavor: "你在边界、亲近与观察里的风格"
+        },
+        {
+          id: "dog",
+          label: "狗狗",
+          intro: "结果更偏陪伴、行动、热情和忠诚感，适合温暖向表达。",
+          context: "遇到一个愿意一起行动的新伙伴时",
+          challenge: "环境吵闹、节奏快但仍需要保持连接时",
+          task: "在热情与可靠之间维持关系",
+          analogy: "像一只会看伙伴眼神的狗",
+          flavor: "你在热情、联结与行动感里的样子"
+        },
+        {
+          id: "relationship",
+          label: "关系沟通",
+          intro: "把结果落在表达、倾听、回应速度和亲密边界上。",
+          context: "进入一段需要持续沟通的关系时",
+          challenge: "误解、情绪和期待不一致的时候",
+          task: "让两个人保持真实沟通",
+          analogy: "在一段真实关系里",
+          flavor: "你在表达、理解和回应里的习惯"
+        }
+      ];
+
+      const scaleLabels = [
+        { value: 1, short: "1", text: "很不像我" },
+        { value: 2, short: "2", text: "有点不像" },
+        { value: 3, short: "3", text: "一般" },
+        { value: 4, short: "4", text: "比较像" },
+        { value: 5, short: "5", text: "非常像" }
+      ];
+
+      const defaults = {
+        schoolId: "act",
+        directionIds: ["work", "boardgame"],
+        customDirection: "",
+        typeCount: 4,
+        questionCount: 12
+      };
+
+      const state = {
+        config: { ...defaults },
+        generated: null,
+        answers: {}
+      };
+
+      const elements = {
+        schoolGrid: document.getElementById("schoolGrid"),
+        directionGrid: document.getElementById("directionGrid"),
+        customDirection: document.getElementById("customDirection"),
+        typeCount: document.getElementById("typeCount"),
+        questionCount: document.getElementById("questionCount"),
+        generateBtn: document.getElementById("generateBtn"),
+        resetBtn: document.getElementById("resetBtn"),
+        systemBadge: document.getElementById("systemBadge"),
+        systemTitle: document.getElementById("systemTitle"),
+        systemIntro: document.getElementById("systemIntro"),
+        typeList: document.getElementById("typeList"),
+        questionPreview: document.getElementById("questionPreview"),
+        shareSection: document.getElementById("shareSection"),
+        shareLink: document.getElementById("shareLink"),
+        copyBtn: document.getElementById("copyBtn"),
+        openBtn: document.getElementById("openBtn"),
+        testPanel: document.getElementById("testPanel"),
+        testTitle: document.getElementById("testTitle"),
+        testIntro: document.getElementById("testIntro"),
+        participantName: document.getElementById("participantName"),
+        answerList: document.getElementById("answerList"),
+        resultBtn: document.getElementById("resultBtn"),
+        resultPanel: document.getElementById("resultPanel"),
+        resultSummary: document.getElementById("resultSummary"),
+        resultMeta: document.getElementById("resultMeta"),
+        resultName: document.getElementById("resultName"),
+        resultTagline: document.getElementById("resultTagline"),
+        resultDesc: document.getElementById("resultDesc"),
+        resultTraits: document.getElementById("resultTraits"),
+        scoreGrid: document.getElementById("scoreGrid"),
+        resultLens: document.getElementById("resultLens"),
+        resultAdvice: document.getElementById("resultAdvice"),
+        resultRisk: document.getElementById("resultRisk"),
+        runnerUp: document.getElementById("runnerUp")
+      };
+
+      function safeEncode(value) {
+        const bytes = new TextEncoder().encode(JSON.stringify(value));
+        let binary = "";
+        bytes.forEach((byte) => {
+          binary += String.fromCharCode(byte);
+        });
+        return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      }
+
+      function safeDecode(value) {
+        const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+        const padded = normalized + "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
+        const binary = atob(padded);
+        const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+        return JSON.parse(new TextDecoder().decode(bytes));
+      }
+
+      function getSchool(id) {
+        return schools.find((item) => item.id === id) || schools[0];
+      }
+
+      function getDirectionById(id) {
+        return directionCatalog.find((item) => item.id === id);
+      }
+
+      function parseCustomDirections(text) {
+        return text
+          .split(/[,，]/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .map((label, index) => ({
+            id: "custom-" + index + "-" + label,
+            label,
+            intro: "这是用户自定义方向，用通用模板生成题目和解释。",
+            context: "切入一个全新的主题场景时",
+            challenge: "风格和规则还不明确的时候",
+            task: "用自己的方式进入一个主题世界",
+            analogy: "在“" + label + "”这条主题线上",
+            flavor: "你在“" + label + "”中的表达方式"
+          }));
+      }
+
+      function getSelectedDirections(config) {
+        const builtIn = config.directionIds.map(getDirectionById).filter(Boolean);
+        const custom = parseCustomDirections(config.customDirection || "");
+        return [...builtIn, ...custom];
+      }
+
+      function getPromptStem(type, direction, variant) {
+        const promptText = type.prompts[variant % type.prompts.length].trim();
+        const stems = [
+          direction.context + "，我通常会" + promptText,
+          "面对" + direction.challenge + "，我会更倾向于" + promptText,
+          "如果要" + direction.task + "，我更可能" + promptText
+        ];
+        return stems[variant % stems.length];
+      }
+
+      function distributeCounts(total, bucketCount) {
+        const base = Math.floor(total / bucketCount);
+        const remainder = total % bucketCount;
+        return Array.from({ length: bucketCount }, (_, index) => base + (index < remainder ? 1 : 0));
+      }
+
+      function buildTypes(config) {
+        const school = getSchool(config.schoolId);
+        const selectedDirections = getSelectedDirections(config);
+        const primaryDirection = selectedDirections[0] || directionCatalog[0];
+        const secondaryDirection = selectedDirections[1];
+        return school.archetypes.slice(0, Number(config.typeCount)).map((type, index) => {
+          const directionLabels = selectedDirections.map((item) => item.label);
+          const thematicLine = [
+            primaryDirection.flavor,
+            secondaryDirection ? "并且带有“" + secondaryDirection.label + "”的第二层气质。" : "整体气质会更鲜明地贴近这个主题。"
+          ].join("");
+          return {
+            ...type,
+            id: "type-" + index,
+            themeLine: thematicLine,
+            directionLabels
+          };
+        });
+      }
+
+      function buildQuestions(types, config) {
+        const selectedDirections = getSelectedDirections(config);
+        const directionPool = selectedDirections.length ? selectedDirections : [directionCatalog[0]];
+        const distribution = distributeCounts(Number(config.questionCount), types.length);
+        const questions = [];
+        let index = 1;
+        types.forEach((type, typeIndex) => {
+          for (let i = 0; i < distribution[typeIndex]; i += 1) {
+            const direction = directionPool[(typeIndex + i) % directionPool.length];
+            questions.push({
+              id: "q-" + index,
+              targetTypeId: type.id,
+              label: getPromptStem(type, direction, i + typeIndex),
+              directionLabel: direction.label
+            });
+            index += 1;
+          }
+        });
+        return questions;
+      }
+
+      function buildGenerated(config) {
+        const school = getSchool(config.schoolId);
+        const selectedDirections = getSelectedDirections(config);
+        const primaryDirection = selectedDirections[0] || directionCatalog[0];
+        const directionNames = selectedDirections.map((item) => item.label);
+        const types = buildTypes(config);
+        const questions = buildQuestions(types, config);
+        const systemTitle = school.short + " × " + primaryDirection.label + "｜" + school.systemWord;
+        const intro = "这是一套基于“" + school.label + "”生成的人格测试，结果解释会重点落在“" + directionNames.join(" / ") + "”这些主题上。";
+        const sharePayload = {
+          schoolId: config.schoolId,
+          directionIds: config.directionIds,
+          customDirection: config.customDirection,
+          typeCount: Number(config.typeCount),
+          questionCount: Number(config.questionCount)
+        };
+        const link = new URL(window.location.href);
+        link.searchParams.set("demo", safeEncode(sharePayload));
+        link.hash = "#take-test";
+
+        return {
+          config: sharePayload,
+          school,
+          directions: selectedDirections,
+          systemTitle,
+          intro,
+          types,
+          questions,
+          shareLink: link.toString()
+        };
+      }
+
+      function renderSchoolOptions() {
+        elements.schoolGrid.innerHTML = "";
+        schools.forEach((school) => {
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = "option-card" + (state.config.schoolId === school.id ? " active" : "");
+          card.innerHTML = "<strong>" + school.label + "</strong><span>" + school.pitch + "</span>";
+          card.addEventListener("click", () => {
+            state.config.schoolId = school.id;
+            renderSchoolOptions();
+          });
+          elements.schoolGrid.appendChild(card);
+        });
+      }
+
+      function renderDirectionOptions() {
+        elements.directionGrid.innerHTML = "";
+        directionCatalog.forEach((direction) => {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "chip" + (state.config.directionIds.includes(direction.id) ? " active" : "");
+          chip.textContent = direction.label;
+          chip.addEventListener("click", () => {
+            if (state.config.directionIds.includes(direction.id)) {
+              state.config.directionIds = state.config.directionIds.filter((id) => id !== direction.id);
+            } else {
+              state.config.directionIds = [...state.config.directionIds, direction.id];
+            }
+            if (!state.config.directionIds.length) {
+              state.config.directionIds = [direction.id];
+            }
+            renderDirectionOptions();
+          });
+          elements.directionGrid.appendChild(chip);
+        });
+      }
+
+      function renderPreview(generated) {
+        elements.systemBadge.textContent = generated.school.label;
+        elements.systemTitle.textContent = generated.systemTitle;
+        elements.systemIntro.textContent = generated.intro;
+        elements.typeList.innerHTML = "";
+        elements.questionPreview.innerHTML = "";
+
+        generated.types.forEach((type) => {
+          const card = document.createElement("article");
+          card.className = "type-card";
+          card.innerHTML =
+            "<h3>" + type.name + "</h3>" +
+            "<p>" + type.tagline + "</p>" +
+            '<div class="meta-row">' + type.traits.map((trait) => "<span>" + trait + "</span>").join("") + "</div>" +
+            "<p>" + type.core + " " + type.themeLine + "</p>";
+          elements.typeList.appendChild(card);
+        });
+
+        generated.questions.slice(0, 6).forEach((question, idx) => {
+          const card = document.createElement("article");
+          card.className = "question-card";
+          card.innerHTML =
+            '<div class="question-head"><div class="question-index">' + (idx + 1) + '</div><div><strong>' +
+            question.label +
+            '</strong><p style="margin-top: 8px;">题目会计入：' +
+            question.directionLabel +
+            " 语境</p></div></div>";
+          elements.questionPreview.appendChild(card);
+        });
+
+        elements.shareSection.classList.remove("hidden");
+        elements.shareLink.textContent = generated.shareLink;
+      }
+
+      function renderAnswerSheet(generated) {
+        elements.testPanel.classList.remove("hidden");
+        elements.testTitle.textContent = generated.systemTitle;
+        elements.testIntro.textContent = "当前测试将围绕“" + generated.directions.map((item) => item.label).join(" / ") + "”来解释你的人格风格。";
+        elements.answerList.innerHTML = "";
+
+        generated.questions.forEach((question, index) => {
+          const card = document.createElement("article");
+          card.className = "question-card";
+          const scales = scaleLabels
+            .map((scale) => {
+              const active = state.answers[question.id] === scale.value ? " active" : "";
+              return (
+                '<button class="scale' +
+                active +
+                '" type="button" data-question="' +
+                question.id +
+                '" data-value="' +
+                scale.value +
+                '"><strong>' +
+                scale.short +
+                "</strong><span>" +
+                scale.text +
+                "</span></button>"
+              );
+            })
+            .join("");
+          card.innerHTML =
+            '<div class="question-head"><div class="question-index">' +
+            (index + 1) +
+            '</div><div><strong>' +
+            question.label +
+            '</strong><p style="margin-top: 8px;">主题语境：' +
+            question.directionLabel +
+            '</p></div></div><div class="likert">' +
+            scales +
+            "</div>";
+          elements.answerList.appendChild(card);
+        });
+
+        elements.answerList.querySelectorAll(".scale").forEach((button) => {
+          button.addEventListener("click", () => {
+            state.answers[button.dataset.question] = Number(button.dataset.value);
+            renderAnswerSheet(generated);
+          });
+        });
+      }
+
+      function getResult(generated) {
+        const scores = generated.types.map((type) => ({
+          type,
+          score: generated.questions
+            .filter((question) => question.targetTypeId === type.id)
+            .reduce((sum, question) => sum + (state.answers[question.id] || 0), 0)
+        }));
+
+        const sorted = [...scores].sort((a, b) => b.score - a.score);
+        return {
+          scores,
+          primary: sorted[0],
+          secondary: sorted[1]
+        };
+      }
+
+      function renderResult(generated) {
+        const result = getResult(generated);
+        const totalAnswered = generated.questions.filter((question) => state.answers[question.id]).length;
+        const primaryDirection = generated.directions[0] || directionCatalog[0];
+        const participantName = elements.participantName.value.trim();
+        const nameLine = participantName ? participantName + " 的结果" : "你的结果";
+
+        elements.resultPanel.classList.remove("hidden");
+        elements.resultSummary.textContent =
+          nameLine +
+          "已经生成。本次测试以“" +
+          generated.school.label +
+          "”为心理框架，并用“" +
+          generated.directions.map((item) => item.label).join(" / ") +
+          "”来包装解释语言。";
+        elements.resultMeta.innerHTML =
+          "<span>" +
+          generated.school.short +
+          "</span><span>" +
+          primaryDirection.label +
+          "</span><span>已答 " +
+          totalAnswered +
+          " / " +
+          generated.questions.length +
+          " 题</span>";
+        elements.resultName.textContent = result.primary.type.name;
+        elements.resultTagline.textContent = result.primary.type.tagline;
+        elements.resultDesc.textContent =
+          result.primary.type.core +
+          " " +
+          generated.school.tone +
+          "。在这个 Demo 里，它会被解释成一种适合“" +
+          primaryDirection.label +
+          "”的风格倾向。";
+        elements.resultTraits.innerHTML = result.primary.type.traits.map((trait) => "<span>" + trait + "</span>").join("");
+        elements.resultLens.textContent =
+          result.primary.type.lens +
+          " 换到“" +
+          primaryDirection.label +
+          "”这条主题线上看，你通常会更自然地表现出这组特征：在 " +
+          primaryDirection.analogy +
+          "，你会优先呈现“" +
+          primaryDirection.flavor +
+          "”。";
+        elements.resultAdvice.textContent =
+          result.primary.type.advice +
+          " 如果把这份结果放进“" +
+          primaryDirection.label +
+          "”的表达里，你会更适合承担能体现你风格优势的位置，而不是被硬塞进完全相反的节奏里。";
+        elements.resultRisk.textContent =
+          result.primary.type.risk +
+          " 这也是正式版里适合扩展成“成长建议”模块的部分。";
+        elements.runnerUp.textContent =
+          result.secondary
+            ? "你的次高类型是“" +
+              result.secondary.type.name +
+              "”。这说明你除了主风格外，也带有“" +
+              result.secondary.type.tagline +
+              "”这一层倾向，适合在不同情境中切换使用。"
+            : "当前题量下还没有明显的次高类型。";
+
+        const maxScore = Math.max(...result.scores.map((item) => item.score), 1);
+        elements.scoreGrid.innerHTML = result.scores
+          .sort((a, b) => b.score - a.score)
+          .map((item) => {
+            const percent = Math.round((item.score / maxScore) * 100);
+            return (
+              '<div class="score-row"><header><span>' +
+              item.type.name +
+              "</span><span>" +
+              item.score +
+              ' 分</span></header><div class="bar"><i style="width:' +
+              percent +
+              '%;"></i></div></div>'
+            );
+          })
+          .join("");
+
+        elements.resultPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function generateAndRender() {
+        state.config.customDirection = elements.customDirection.value.trim();
+        state.config.typeCount = Number(elements.typeCount.value);
+        state.config.questionCount = Number(elements.questionCount.value);
+        state.generated = buildGenerated(state.config);
+        state.answers = {};
+        renderPreview(state.generated);
+        renderAnswerSheet(state.generated);
+        elements.resultPanel.classList.add("hidden");
+      }
+
+      function resetDefaults() {
+        state.config = { ...defaults };
+        state.answers = {};
+        elements.customDirection.value = defaults.customDirection;
+        elements.typeCount.value = String(defaults.typeCount);
+        elements.questionCount.value = String(defaults.questionCount);
+        renderSchoolOptions();
+        renderDirectionOptions();
+        generateAndRender();
+      }
+
+      function loadFromLink() {
+        const payload = new URLSearchParams(window.location.search).get("demo");
+        if (!payload) {
+          resetDefaults();
+          return;
+        }
+        try {
+          const config = safeDecode(payload);
+          state.config = {
+            schoolId: config.schoolId || defaults.schoolId,
+            directionIds: Array.isArray(config.directionIds) && config.directionIds.length ? config.directionIds : defaults.directionIds,
+            customDirection: config.customDirection || "",
+            typeCount: Number(config.typeCount) || defaults.typeCount,
+            questionCount: Number(config.questionCount) || defaults.questionCount
+          };
+          elements.customDirection.value = state.config.customDirection;
+          elements.typeCount.value = String(state.config.typeCount);
+          elements.questionCount.value = String(state.config.questionCount);
+          renderSchoolOptions();
+          renderDirectionOptions();
+          generateAndRender();
+          if (window.location.hash === "#take-test") {
+            elements.testPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        } catch (error) {
+          resetDefaults();
+        }
+      }
+
+      elements.generateBtn.addEventListener("click", generateAndRender);
+      elements.resetBtn.addEventListener("click", resetDefaults);
+      elements.copyBtn.addEventListener("click", async () => {
+        if (!state.generated) return;
+        try {
+          await navigator.clipboard.writeText(state.generated.shareLink);
+          elements.copyBtn.textContent = "已复制";
+          setTimeout(() => {
+            elements.copyBtn.textContent = "复制链接";
+          }, 1400);
+        } catch (error) {
+          elements.copyBtn.textContent = "复制失败";
+          setTimeout(() => {
+            elements.copyBtn.textContent = "复制链接";
+          }, 1400);
+        }
+      });
+      elements.openBtn.addEventListener("click", () => {
+        if (!state.generated) return;
+        window.history.replaceState({}, "", state.generated.shareLink);
+        elements.testPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      elements.resultBtn.addEventListener("click", () => {
+        if (!state.generated) return;
+        const unanswered = state.generated.questions.filter((question) => !state.answers[question.id]).length;
+        if (unanswered) {
+          window.alert("还有 " + unanswered + " 道题没答完，先补齐再看结果。");
+          return;
+        }
+        renderResult(state.generated);
+      });
+
+      elements.customDirection.addEventListener("input", (event) => {
+        state.config.customDirection = event.target.value;
+      });
+      elements.typeCount.addEventListener("change", (event) => {
+        state.config.typeCount = Number(event.target.value);
+      });
+      elements.questionCount.addEventListener("change", (event) => {
+        state.config.questionCount = Number(event.target.value);
+      });
+
+      renderSchoolOptions();
+      renderDirectionOptions();
+      loadFromLink();
+    </script>
+  </body>
+</html>

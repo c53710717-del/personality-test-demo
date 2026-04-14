@@ -1,0 +1,9 @@
+{
+  "name": "splendor-common",
+  "private": true,
+  "type": "module",
+  "main": "src/game.js",
+  "scripts": {
+    "build": "echo 'common: no build step'"
+  }
+}

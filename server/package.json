@@ -1,0 +1,16 @@
+{
+  "name": "splendor-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env src/index.js",
+    "build": "echo 'server: no build step'"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "ws": "^8.18.0"
+  }
+}
