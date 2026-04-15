@@ -168,6 +168,13 @@ function getAxisCount(typeCount) {
   return 2;
 }
 
+function getExpectedTypeCount(typeCount, axisCount) {
+  if (Number(typeCount) >= 32 || axisCount >= 5) return 32;
+  if (Number(typeCount) >= 16 || axisCount >= 4) return 16;
+  if (Number(typeCount) >= 8 || axisCount >= 3) return 8;
+  return 4;
+}
+
 function slugify(value) {
   return String(value || "")
     .toLowerCase()
@@ -485,22 +492,63 @@ ${rawText}
   });
 }
 
+function buildSignatureKey(signatureSides = [], axisCount = 0) {
+  return Array.from({ length: axisCount }, (_, index) => (signatureSides[index] === "right" ? "R" : "L")).join("");
+}
+
+function getAllSignatureKeys(axisCount, expectedTypeCount) {
+  const max = Math.min(2 ** axisCount, expectedTypeCount);
+  return Array.from({ length: max }, (_, number) =>
+    number
+      .toString(2)
+      .padStart(axisCount, "0")
+      .replaceAll("0", "L")
+      .replaceAll("1", "R")
+  );
+}
+
+function synthesizeArchetype({ signatureKey, axes, index, title, resultNoun }) {
+  const signatureSides = signatureKey.split("").map((value) => (value === "R" ? "right" : "left"));
+  const pickedLabels = axes.map((axis, axisIndex) =>
+    signatureSides[axisIndex] === "right" ? axis.right.label : axis.left.label
+  );
+  const shortPieces = pickedLabels.slice(0, 2);
+  const shortName = shortPieces.join("·") || `结果 ${index + 1}`;
+  const fullName = `${shortName}${resultNoun ? ` ${resultNoun}` : ""}`.trim();
+  const traits = pickedLabels.slice(0, 3);
+
+  return {
+    id: `type-${signatureKey.toLowerCase()}`,
+    code: signatureKey,
+    name: fullName,
+    tagline: `你更像把 ${pickedLabels.join(" / ")} 这组气质揉在一起的那类人。`,
+    traits,
+    lens: `${title || "这套测试"}里，你会自然站到 ${pickedLabels.join("、")} 这一侧，别人也更容易这样记住你。`,
+    advice: `先把 ${pickedLabels[0]} 这面用好，再补足 ${pickedLabels[pickedLabels.length - 1]} 这一侧的弹性。`,
+    risk: `当压力上来时，你可能会把 ${pickedLabels.join("、")} 推得太满，反而显得用力过猛。`,
+    examples: [],
+    signature: Object.fromEntries(
+      axes.map((axis, axisIndex) => [axis.id, signatureSides[axisIndex] === "right" ? "right" : "left"])
+    )
+  };
+}
+
 function normalizeGeneratedSystem(raw) {
   const expectedAxisCount = getAxisCount(raw.typeCount || raw.archetypes?.length || 16);
-  const expectedTypeCount = Number(raw.typeCount) || (expectedAxisCount === 5 ? 32 : expectedAxisCount === 4 ? 16 : 4);
+  const expectedTypeCount = getExpectedTypeCount(raw.typeCount, expectedAxisCount);
 
   const axes = (raw.axes || []).slice(0, expectedAxisCount).map((axis, index) => ({
     id: axis.id || `axis_${index + 1}`,
-    label: axis.label,
+    label: axis.label || `维度 ${index + 1}`,
     left: {
       key: axis.leftKey || `left_${index + 1}`,
-      label: axis.leftLabel,
-      description: axis.leftDescription
+      label: axis.leftLabel || `左侧 ${index + 1}`,
+      description: axis.leftDescription || `更偏向 ${axis.leftLabel || `左侧 ${index + 1}`}`
     },
     right: {
       key: axis.rightKey || `right_${index + 1}`,
-      label: axis.rightLabel,
-      description: axis.rightDescription
+      label: axis.rightLabel || `右侧 ${index + 1}`,
+      description: axis.rightDescription || `更偏向 ${axis.rightLabel || `右侧 ${index + 1}`}`
     }
   }));
 
@@ -518,43 +566,84 @@ function normalizeGeneratedSystem(raw) {
     ])
   );
 
-  const archetypes = (raw.archetypes || []).slice(0, expectedTypeCount).map((type, index) => ({
-    id: type.id || `${slugify(type.code || type.name || `type-${index + 1}`)}`,
-    code: type.code || `类型${index + 1}`,
-    name: type.name || `结果 ${index + 1}`,
-    tagline: type.tagline || "",
-    traits: Array.isArray(type.traits) ? type.traits.slice(0, 3) : [],
-    lens: type.lens || "",
-    advice: type.advice || "",
-    risk: type.risk || "",
-    examples: Array.isArray(type.examples) ? type.examples.slice(0, 3) : [],
-    signature: Object.fromEntries(
-      axes.map((axis, axisIndex) => [axis.id, type.signatureSides?.[axisIndex] === "right" ? "right" : "left"])
-    )
-  }));
+  const allSignatureKeys = getAllSignatureKeys(expectedAxisCount, expectedTypeCount);
+  const archetypeMap = new Map();
 
-  if (archetypes.length !== expectedTypeCount) {
-    throw new Error(`Model did not return ${expectedTypeCount} valid archetypes.`);
+  (raw.archetypes || []).forEach((type, index) => {
+    const signatureSides = Array.from({ length: expectedAxisCount }, (_, axisIndex) =>
+      type.signatureSides?.[axisIndex] === "right" ? "right" : "left"
+    );
+    const signatureKey = buildSignatureKey(signatureSides, expectedAxisCount);
+    if (!signatureKey || archetypeMap.has(signatureKey)) return;
+
+    archetypeMap.set(signatureKey, {
+      id: type.id || `${slugify(type.code || type.name || `type-${index + 1}`)}`,
+      code: type.code || signatureKey,
+      name: type.name || `结果 ${index + 1}`,
+      tagline: type.tagline || "",
+      traits: Array.isArray(type.traits) ? type.traits.slice(0, 3) : [],
+      lens: type.lens || "",
+      advice: type.advice || "",
+      risk: type.risk || "",
+      examples: Array.isArray(type.examples) ? type.examples.slice(0, 3) : [],
+      signature: Object.fromEntries(
+        axes.map((axis, axisIndex) => [axis.id, signatureSides[axisIndex] === "right" ? "right" : "left"])
+      )
+    });
+  });
+
+  for (let index = 0; index < allSignatureKeys.length; index += 1) {
+    const signatureKey = allSignatureKeys[index];
+    if (!archetypeMap.has(signatureKey)) {
+      archetypeMap.set(
+        signatureKey,
+        synthesizeArchetype({
+          signatureKey,
+          axes,
+          index,
+          title: raw.title,
+          resultNoun: raw.resultNoun
+        })
+      );
+    }
   }
+
+  const archetypes = allSignatureKeys.map((signatureKey) => archetypeMap.get(signatureKey)).slice(0, expectedTypeCount);
 
   return {
     id: `ai-${slugify(raw.title)}`,
-    title: raw.title,
-    intro: raw.intro,
-    logicTitle: raw.logicTitle,
-    logicIntro: raw.logicIntro,
-    resultNoun: raw.resultNoun,
-    playfulLine: raw.playfulLine,
-    storyTitle: raw.storyTitle,
-    matchTitle: raw.matchTitle,
+    title: raw.title || "生成一套适合被转发的测试。",
+    intro: raw.intro || "选一个你想让人一眼记住的主题，我们会先生成一套可做、可分享、可讨论的人格测试。",
+    logicTitle: raw.logicTitle || "这套测试会怎么识别你的结果走向",
+    logicIntro: raw.logicIntro || "它会先看几条核心维度，再把不同侧面的组合拼成人格结果。",
+    resultNoun: raw.resultNoun || "人格",
+    playfulLine: raw.playfulLine || "测出来的不只是结论，也是一句适合发出去的自我介绍。",
+    storyTitle: raw.storyTitle || "你更像哪些人物的一面",
+    matchTitle: raw.matchTitle || "谁会一眼认出你这种气质",
     typeCount: expectedTypeCount,
     axes,
     questionsByAxis: Object.fromEntries(
       axes.map((axis) => [
         axis.id,
-        questionMap.get(axis.id) || {
-          left: [`我更像“${axis.left.label}”这边的人。`],
-          right: [`我更像“${axis.right.label}”这边的人。`]
+        {
+          left: (() => {
+            const current = questionMap.get(axis.id)?.left || [];
+            const fallback = [
+              `通常来说，我更容易站到“${axis.left.label}”这一侧。`,
+              `遇到需要判断的时候，我更像“${axis.left.label}”这边的人。`,
+              `在压力上来时，我往往会先表现出“${axis.left.label}”这一面。`
+            ];
+            return [...current, ...fallback].slice(0, 3);
+          })(),
+          right: (() => {
+            const current = questionMap.get(axis.id)?.right || [];
+            const fallback = [
+              `通常来说，我更容易站到“${axis.right.label}”这一侧。`,
+              `遇到需要判断的时候，我更像“${axis.right.label}”这边的人。`,
+              `在压力上来时，我往往会先表现出“${axis.right.label}”这一面。`
+            ];
+            return [...current, ...fallback].slice(0, 3);
+          })()
         }
       ])
     ),
