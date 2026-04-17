@@ -571,7 +571,7 @@ export const defaultConfig = {
   generatedSystem: null
 };
 
-export const supportedTypeCounts = [4, 16, 32];
+export const supportedTypeCounts = [4, 8, 16, 32];
 export const supportedQuestionCounts = [12, 20, 32, 40];
 
 const directionThemes = {
@@ -908,6 +908,7 @@ const matrixAxes = [
 
 const suffixByAxisCount = {
   2: ["远征者", "调频者", "炼成者", "校准者"],
+  3: ["远征者", "校准者"],
   4: ["远征者", "调频者", "炼成者", "校准者"],
   5: ["远征者", "守门人", "点灯人", "调频者", "炼成者", "编排者", "召集者", "校准者"]
 };
@@ -1744,6 +1745,14 @@ function getWorkSchoolFrame(schoolId) {
   return workSchoolFrames[schoolId] || workSchoolFrames.act;
 }
 
+function normalizeNarrativePhrase(value, fallback = "") {
+  const next = typeof value === "string" ? value.trim() : "";
+  if (!next) return fallback;
+  const lowered = next.toLowerCase();
+  if (lowered === "undefined" || lowered === "null") return fallback;
+  return next;
+}
+
 export function buildResultNarrative(generated, result, viewerName = "这位测试者") {
   const direction = generated.directions[0] || directionCatalog[0];
   const theme = generated.themeMeta || getTheme(direction);
@@ -1753,22 +1762,32 @@ export function buildResultNarrative(generated, result, viewerName = "这位测�
   const secondaryType = result.secondary?.type;
   const examples = pickExamples(direction, type);
   const leadExample = examples[0];
+  const safeTraits = Array.isArray(type.traits) && type.traits.length ? type.traits : ["自己的方式"];
+  const lensPrefix = normalizeNarrativePhrase(theme.lensPrefix, "如果把你放进这个主题场景里");
+  const advicePrefix = normalizeNarrativePhrase(theme.advicePrefix, "你更适合的");
+  const riskPrefix = normalizeNarrativePhrase(theme.riskPrefix, "真正容易拖住你的");
+  const lensText = normalizeNarrativePhrase(type.lens);
+  const adviceText = normalizeNarrativePhrase(type.advice);
+  const riskText = normalizeNarrativePhrase(type.risk);
+  const lensDetail = lensText ? ` ${lensText}` : "";
+  const adviceDetail = adviceText ? ` ${adviceText}` : "";
+  const riskDetail = riskText ? ` ${riskText}` : "";
 
   return {
     heading: `${viewerName} 的${theme.resultNoun}是 ${type.name}`,
     wittySummary: `${workFrame ? workFrame.summaryLead : theme.playfulLine} ${type.tagline}`,
     lensTitle: workFrame?.lensTitle || "如果把你放进一个复杂现场里",
     lensBody: workFrame
-      ? `${workFrame.lensLead(type)} ${type.lens}`
-      : `${theme.lensPrefix}，你更像那种会把“${type.traits.join("、")}”揉进日常动作里的人。${type.lens}`,
+      ? `${workFrame.lensLead({ ...type, traits: safeTraits })}${lensDetail}`
+      : `${lensPrefix}，你更像那种会把“${safeTraits.join("、")}”揉进日常动作里的人。${lensDetail}`.trim(),
     adviceTitle: workFrame?.adviceTitle || "你舒服的时候怎么发力",
     adviceBody: workFrame
-      ? `${workFrame.adviceLead(type)} ${type.advice}`
-      : `${theme.advicePrefix}，而是待在一个能放大你优势的位置里。${type.advice}`,
+      ? `${workFrame.adviceLead({ ...type, traits: safeTraits })}${adviceDetail}`
+      : `${advicePrefix}，而是待在一个能放大你优势的位置里。${adviceDetail}`.trim(),
     riskTitle: workFrame?.riskTitle || "你容易在哪种时刻被拖累",
     riskBody: workFrame
-      ? `${workFrame.riskLead(type)} ${type.risk}`
-      : `${theme.riskPrefix}，而是太容易替场面、关系或者意义多扛一层。${type.risk}`,
+      ? `${workFrame.riskLead({ ...type, traits: safeTraits })}${riskDetail}`
+      : `${riskPrefix}，而是太容易替场面、关系或者意义多扛一层。${riskDetail}`.trim(),
     matchTitle: workFrame?.matchTitle || theme.matchTitle || "更直白一点说",
     matchBody: workFrame
       ? workFrame.matchBody(leadExample, type)
@@ -1955,6 +1974,7 @@ function distributeCounts(total, bucketCount) {
 function getAxisCountForTypeCount(typeCount) {
   if (typeCount >= 32) return 5;
   if (typeCount >= 16) return 4;
+  if (typeCount >= 8) return 3;
   return 2;
 }
 
@@ -2102,8 +2122,10 @@ export function buildGenerated(config, baseUrl, routeOptions = {}) {
     logicAxes: axes.map((axis) => ({
       id: axis.id,
       label: axis.label,
+      leftCode: axis.left.code || "",
       left: axis.left.label || axis.left.name,
       leftDescription: axis.left.description || axis.left.summary,
+      rightCode: axis.right.code || "",
       right: axis.right.label || axis.right.name,
       rightDescription: axis.right.description || axis.right.summary
     })),
@@ -2112,7 +2134,9 @@ export function buildGenerated(config, baseUrl, routeOptions = {}) {
       code: type.code,
       name: type.name,
       tagline: type.tagline,
-      traits: type.traits
+      traits: type.traits,
+      lens: type.lens || "",
+      advice: type.advice || ""
     })),
     shareLink: shareUrl.toString()
   };

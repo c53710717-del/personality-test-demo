@@ -14,6 +14,8 @@ import {
 } from "./personalityDemoData.js";
 import { fetchGeneratedPersonalityTest, generatePersonalityTest } from "./api.js";
 
+const SITE_TITLE = "可分享人格测试";
+
 function getBaseUrl() {
   return `${window.location.origin}${window.location.pathname}`;
 }
@@ -44,6 +46,24 @@ function parseRoute(href) {
   }
 
   return { view: "builder" };
+}
+
+function resolveDirectionLabel(configLike) {
+  if (!configLike) return "人格";
+  if (configLike.customDirection?.trim()) return configLike.customDirection.trim();
+  const primaryDirectionId = configLike.directionIds?.[0];
+  const primaryDirection = directionCatalog.find((item) => item.id === primaryDirectionId) || directionCatalog[0];
+  return primaryDirection?.label || "人格";
+}
+
+function buildTestName(configLike) {
+  const directionLabel = resolveDirectionLabel(configLike);
+  return directionLabel.includes("人格测试") ? directionLabel : `${directionLabel}人格测试`;
+}
+
+function buildDocumentTitle(pageTitle) {
+  if (!pageTitle) return SITE_TITLE;
+  return `${pageTitle} · ${SITE_TITLE}`;
 }
 
 function navigateTo(url, replace = false) {
@@ -97,19 +117,108 @@ function AnswerQuestionCard({ question, index, value, onAnswer }) {
   );
 }
 
-function ShareBanner({ code, name, tagline, note }) {
+function buildTypeCodeLegend(typeCode, logicAxes = []) {
+  if (!typeCode || !logicAxes.length) return [];
+
+  const separatedTokens = typeCode
+    .split(/[\s\-_/|·]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+  const tokens = separatedTokens.length === logicAxes.length
+    ? separatedTokens
+    : (() => {
+        const compactCode = typeCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+        if (!compactCode) return [];
+
+        const compactTokens = [];
+        let cursor = 0;
+
+        for (const axis of logicAxes) {
+          const options = [axis.leftCode, axis.rightCode]
+            .filter(Boolean)
+            .map((token) => String(token).toUpperCase())
+            .sort((a, b) => b.length - a.length);
+          const matched = options.find((option) => compactCode.slice(cursor).startsWith(option));
+          if (!matched) return [];
+          compactTokens.push(matched);
+          cursor += matched.length;
+        }
+
+        return cursor === compactCode.length ? compactTokens : [];
+      })();
+
+  if (tokens.length !== logicAxes.length) return [];
+
+  return logicAxes
+    .map((axis, index) => {
+      const token = tokens[index];
+      const normalizedToken = String(token).toUpperCase();
+      if (!token) return null;
+
+      if (normalizedToken === String(axis.leftCode || "").toUpperCase()) {
+        return { code: axis.leftCode, label: axis.left, description: axis.leftDescription };
+      }
+
+      if (normalizedToken === String(axis.rightCode || "").toUpperCase()) {
+        return { code: axis.rightCode, label: axis.right, description: axis.rightDescription };
+      }
+
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function AxisCodeGuide({ logicAxes = [], title = "字母缩写说明", description = "结果字母不是黑话，每一位都对应一条清晰维度。" }) {
+  const rows = logicAxes.filter((axis) => axis.leftCode || axis.rightCode);
+  if (!rows.length) return null;
+
+  return (
+    <section className="code-guide-card">
+      <div className="code-guide-head">
+        <strong>{title}</strong>
+        <p>{description}</p>
+      </div>
+      <div className="code-guide-grid">
+        {rows.map((axis) => (
+          <article key={axis.id} className="code-guide-axis">
+            <span>{axis.label}</span>
+            <div className="code-guide-pairs">
+              <div>
+                <strong>{axis.leftCode}</strong>
+                <b>{axis.left}</b>
+                <p>{axis.leftDescription}</p>
+              </div>
+              <div>
+                <strong>{axis.rightCode}</strong>
+                <b>{axis.right}</b>
+                <p>{axis.rightDescription}</p>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ShareBanner({ name, tagline, code = "", codeLegend = [] }) {
   return (
     <div className="share-poster">
-      <div className="share-poster-code">{code}</div>
       <div>
+        {code ? <span className="type-code">{code}</span> : null}
         <h3>{name}</h3>
         <p>{tagline}</p>
+        {codeLegend.length ? (
+          <div className="result-code-legend">
+            {codeLegend.map((item) => (
+              <span key={`${item.code}-${item.label}`}>
+                <strong>{item.code}</strong>
+                {item.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
-      {note ? (
-        <div className="share-poster-meta">
-          <span>{note}</span>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -124,54 +233,233 @@ function StoryCard({ item }) {
   );
 }
 
-const generationLoadingSteps = [
-  {
-    title: "正在生成测试问题",
-    body: "把这个主题里最有意思、最能区分人的问题先写出来。"
-  },
-  {
-    title: "正在命名人格类型",
-    body: "给这套测试长出更像话题名片、也更容易被记住的结果名。"
-  },
-  {
-    title: "正在包装分享结果",
-    body: "把结果卡打磨成更适合截图、转发和讨论的版本。"
-  }
-];
+const generationMilestones = ["写出测试标题", "长出第一道题", "生成结果卡"];
 
-function GenerationProgressCard({ currentStep, stage }) {
+function getExpectedPreviewTimeMs(configLike) {
+  const typeCount = Number(configLike?.typeCount) || 16;
+  const questionCount = Number(configLike?.questionCount) || 20;
+  const typeWeight = { 4: 12000, 8: 22000, 16: 45000, 32: 70000 };
+  const questionOffset = Math.max(0, questionCount - 12) * 500;
+  return (typeWeight[typeCount] || 45000) + questionOffset;
+}
+
+function getExpectedCompletionTimeMs(configLike) {
+  const typeCount = Number(configLike?.typeCount) || 16;
+  const questionCount = Number(configLike?.questionCount) || 20;
+  const typeWeight = { 4: 42000, 8: 70000, 16: 140000, 32: 220000 };
+  const questionOffset = Math.max(0, questionCount - 12) * 1200;
+  return (typeWeight[typeCount] || 140000) + questionOffset;
+}
+
+function formatWaitLabel(elapsedMs) {
+  const totalSeconds = Math.max(1, Math.round(elapsedMs / 1000));
+  if (totalSeconds < 60) return `已等待 ${totalSeconds} 秒`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `已等待 ${minutes} 分 ${seconds} 秒`;
+}
+
+function formatExpectedLabel(expectedMs) {
+  const totalSeconds = Math.round(expectedMs / 1000);
+  if (totalSeconds < 60) return `通常约 ${totalSeconds} 秒`;
+  const minutes = Math.round(totalSeconds / 60);
+  return `通常约 ${minutes} 分钟`;
+}
+
+function getDraftingSummaryLabel(stage) {
+  if (stage === "examples") return "示例内容补齐中";
+  if (stage === "retrying") return "正在重新补齐";
+  return "结果文案补齐中";
+}
+
+function getDraftingNote(stage, configLike) {
+  if (stage === "examples") {
+    return {
+      title: "你现在已经可以先预览、先分享。",
+      body: `测试题和结果主文案已经可用；人物示例和分享表达还在继续补齐，${formatExpectedLabel(getExpectedCompletionTimeMs(configLike) * 0.35)}。`
+    };
+  }
+
+  return {
+    title: "可预览版已经生成好了。",
+    body: `你现在就能预览、先分享；结果页文案还会继续补齐，完整版${formatExpectedLabel(getExpectedCompletionTimeMs(configLike))}。`
+  };
+}
+
+function getGeneratedSubcopy(status, stage, configLike) {
+  if (status !== "drafting") {
+    return "现在就能把它发出去，也可以先直接看看这套测试生成出来的结果框架。";
+  }
+
+  if (stage === "examples") {
+    return `现在就能把它发出去。测试题和结果主文案已经可用；人物示例和分享表达还在继续补齐，完整版${formatExpectedLabel(getExpectedCompletionTimeMs(configLike) * 0.35)}。`;
+  }
+
+  return `现在就能把它发出去。测试题和人格结果已经可用；结果页文案还在后台继续补齐，完整版${formatExpectedLabel(getExpectedCompletionTimeMs(configLike))}。`;
+}
+
+function getProgressPercent(elapsedMs, expectedMs) {
+  const normalized = Math.max(0, elapsedMs) / Math.max(expectedMs, 1);
+
+  if (normalized < 0.25) {
+    return 8 + normalized * 80;
+  }
+
+  if (normalized < 0.75) {
+    return 28 + ((normalized - 0.25) / 0.5) * 32;
+  }
+
+  if (normalized < 1.15) {
+    return 60 + ((normalized - 0.75) / 0.4) * 16;
+  }
+
+  return 76 + Math.min(8, ((normalized - 1.15) / 0.8) * 8);
+}
+
+function buildGenerationPreviewContent(configLike) {
+  const directionLabel = resolveDirectionLabel(configLike).replace(/人格测试$/, "");
+
+  if (directionLabel.includes("职场")) {
+    return {
+      question: "“当协作里出现分歧时，你更像先稳住场面，还是先拉回目标？”",
+      resultName: "稳场协作者",
+      resultDescription: "既能接住现场气氛，也能把讨论慢慢带回真正要解决的问题。"
+    };
+  }
+
+  if (directionLabel.includes("关系")) {
+    return {
+      question: "“关系里出现误会时，你更像先安抚情绪，还是先把话说清楚？”",
+      resultName: "关系点灯人",
+      resultDescription: "很会找到对话里的转折点，让尴尬的场面重新亮起来。"
+    };
+  }
+
+  if (directionLabel.includes("情绪")) {
+    return {
+      question: "“情绪上头的时候，你更像先把感受说出来，还是先把自己稳住？”",
+      resultName: "情绪翻译者",
+      resultDescription: "能把模糊的心情说清楚，也能帮别人看见自己真正卡住的地方。"
+    };
+  }
+
+  return {
+    question: `“在${directionLabel || "这个主题"}里，别人最容易因你身上的哪种反应记住你？”`,
+    resultName: "共情控场者",
+    resultDescription: "很会接人、稳住场面，也让别人愿意继续把话说下去。"
+  };
+}
+
+function GenerationPreviewMock({ testName, configLike, revealLevel }) {
+  const typeCount = Number(configLike?.typeCount) || 16;
+  const questionCount = Number(configLike?.questionCount) || 20;
+  const previewContent = buildGenerationPreviewContent(configLike);
+  const showTitle = revealLevel >= 1;
+  const showQuestion = revealLevel >= 2;
+  const showResult = revealLevel >= 3;
+
+  return (
+    <aside className="generation-preview-shell" aria-label="生成预览">
+      <div className="generation-preview-window">
+        <div className="generation-preview-toolbar">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="generation-preview-topline">
+          <b className={showTitle ? "generation-reveal is-visible" : "generation-reveal"}>
+            {showTitle ? testName : " "}
+          </b>
+          <em>{typeCount} 型</em>
+        </div>
+        <div className="generation-preview-canvas">
+          <section className={`generation-preview-question${showQuestion ? "" : " is-pending"}`}>
+            <span className="generation-preview-tag">Question</span>
+            <strong className={showQuestion ? "generation-reveal is-visible" : "generation-reveal"}>
+              {showQuestion ? previewContent.question : " "}
+            </strong>
+            <div className="generation-preview-scale">
+              {["1", "2", "3", "4", "5"].map((item) => (
+                <i key={item}>{item}</i>
+              ))}
+            </div>
+          </section>
+
+          <section className={`generation-preview-result${showResult ? "" : " is-pending"}`}>
+            <span className="generation-preview-tag neutral">Result</span>
+            <strong className={showResult ? "generation-reveal is-visible" : "generation-reveal"}>
+              {showResult ? previewContent.resultName : " "}
+            </strong>
+            <p className={showResult ? "generation-reveal is-visible" : "generation-reveal"}>
+              {showResult ? previewContent.resultDescription : " "}
+            </p>
+            <div className="generation-preview-code">
+              <span>E</span>
+              <span>A</span>
+              <span>C</span>
+              <span>S</span>
+            </div>
+          </section>
+        </div>
+        <div className="generation-preview-footer">
+          <span>{questionCount} 题</span>
+          <span>生成中</span>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function GenerationProgressCard({ testName, configLike }) {
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setElapsedMs(Date.now() - startedAt);
+    }, 400);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const expectedPreviewTimeMs = getExpectedPreviewTimeMs(configLike);
+  const progressWidth = getProgressPercent(elapsedMs, expectedPreviewTimeMs);
+  const revealLevel = progressWidth >= 68 ? 3 : progressWidth >= 42 ? 2 : progressWidth >= 18 ? 1 : 0;
+  const activeMilestoneIndex = revealLevel >= generationMilestones.length ? generationMilestones.length - 1 : revealLevel;
+  const expectedCompletionTimeMs = getExpectedCompletionTimeMs(configLike);
+
   return (
     <section className="panel generation-progress-card">
       <div className="generation-progress-hero">
         <div>
-          <div className="system-badge">生成中</div>
-          <h2>{generationLoadingSteps[currentStep].title}</h2>
-          <p className="sub">{generationLoadingSteps[currentStep].body}</p>
-        </div>
-        <div className="generation-visual" aria-hidden="true">
-          <div className="generation-orbit generation-orbit-a" />
-          <div className="generation-orbit generation-orbit-b" />
-          <div className="generation-orbit generation-orbit-c" />
-          <div className="generation-core">
-            <span>TEST</span>
+          <div className="system-badge">人格测试</div>
+          <h2>正在生成「{testName}」</h2>
+          <p className="sub">
+            先生成可预览版，{formatExpectedLabel(expectedPreviewTimeMs)}；完整版会继续在后台补齐，{formatExpectedLabel(expectedCompletionTimeMs)}。
+          </p>
+          <div className="generation-milestone-row" aria-label="生成进度">
+            {generationMilestones.map((label, index) => {
+              const status = index < revealLevel ? "done" : index === activeMilestoneIndex ? "active" : "pending";
+              return (
+                <div key={label} className={`generation-milestone ${status}`}>
+                  <span className="generation-milestone-dot" aria-hidden="true" />
+                  <strong>{label}</strong>
+                </div>
+              );
+            })}
           </div>
-          <div className="generation-spark generation-spark-a">题目</div>
-          <div className="generation-spark generation-spark-b">人格</div>
-          <div className="generation-spark generation-spark-c">结果卡</div>
         </div>
+        <GenerationPreviewMock testName={testName} configLike={configLike} revealLevel={revealLevel} />
       </div>
       <div className="progress-rail top-gap">
-        <i style={{ width: `${((currentStep + 1) / generationLoadingSteps.length) * 100}%` }} />
+        <i style={{ width: `${progressWidth}%` }} />
       </div>
-      <div className="generation-step-list">
-        {generationLoadingSteps.map((item, index) => (
-          <article key={item.title} className={`generation-step${index <= currentStep ? " active" : ""}`}>
-            <strong>{item.title}</strong>
-            <p>{item.body}</p>
-          </article>
-        ))}
+      <div className="progress-meta">
+        <span>{formatWaitLabel(elapsedMs)}</span>
+        <span>可预览版{formatExpectedLabel(expectedPreviewTimeMs)}</span>
       </div>
-      {stage ? <div className="generation-stage-note">当前进展：{stage}</div> : null}
     </section>
   );
 }
@@ -239,18 +527,18 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
   const [generationError, setGenerationError] = useState("");
   const [generationStatus, setGenerationStatus] = useState("idle");
   const [generationStage, setGenerationStage] = useState("");
-  const [generationPulse, setGenerationPulse] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
   const generated = useMemo(
     () => buildGenerated(generatedConfig || config, getBaseUrl(), generatedDemoId ? { demoId: generatedDemoId } : {}),
     [config, generatedConfig, generatedDemoId]
   );
+  const draftTestName = useMemo(() => buildTestName(config), [config]);
+  const generatedTestName = useMemo(() => buildTestName(generatedConfig || config), [config, generatedConfig]);
 
-  const generationStepIndex = useMemo(() => {
-    if (generationStatus === "ready") return generationLoadingSteps.length - 1;
-    if (generationStage === "copy") return 2;
-    if (generationStage === "skeleton") return 1;
-    return generationPulse % generationLoadingSteps.length;
-  }, [generationPulse, generationStage, generationStatus]);
+  useEffect(() => {
+    document.title = buildDocumentTitle(isGenerated ? generatedTestName : "可分享人格测试生成器");
+  }, [generatedTestName, isGenerated]);
 
   useEffect(() => {
     setIsGenerated(false);
@@ -260,15 +548,9 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
     setGenerationError("");
     setGenerationStatus("idle");
     setGenerationStage("");
+    setRetryCount(0);
+    setIsRetrying(false);
   }, [config]);
-
-  useEffect(() => {
-    if (!isGenerating) return undefined;
-    const timer = window.setInterval(() => {
-      setGenerationPulse((value) => value + 1);
-    }, 1800);
-    return () => window.clearInterval(timer);
-  }, [isGenerating]);
 
   useEffect(() => {
     if (!isGenerated || !generatedDemoId || generationStatus !== "drafting") return undefined;
@@ -313,12 +595,14 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
 
   const copyLabel = copyState === "success" ? "已复制" : copyState === "error" ? "复制失败" : "复制测试入口";
 
-  async function handleGenerate() {
+  async function runGeneration(sourceConfig, options = {}) {
+    const { retrying = false } = options;
     setIsGenerating(true);
+    setIsRetrying(retrying);
     setGenerationError("");
-    setGenerationStatus("drafting");
-    setGenerationStage("skeleton");
-    const nextConfig = normalizeConfig(config);
+    setGenerationStatus(retrying ? "retrying" : "drafting");
+    setGenerationStage(retrying ? "retrying" : "skeleton");
+    const nextConfig = normalizeConfig(sourceConfig);
 
     try {
       if (shouldRequestGeneratedSystem(nextConfig)) {
@@ -340,19 +624,54 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
       }
 
       setIsGenerated(true);
+      setShowLogic(true);
+      setRetryCount(0);
     } catch (error) {
-      setIsGenerated(false);
       setGenerationStatus("failed");
       setGenerationError(error.message || "生成失败，请稍后再试。");
     } finally {
       setIsGenerating(false);
+      setIsRetrying(false);
     }
   }
 
+  async function handleGenerate() {
+    setRetryCount(0);
+    await runGeneration(config);
+  }
+
+  async function handleRetry() {
+    setRetryCount(0);
+    await runGeneration(generatedConfig || config, { retrying: true });
+  }
+
+  useEffect(() => {
+    if (generationStatus !== "failed" || isGenerating || retryCount >= 2) return undefined;
+
+    const timer = window.setTimeout(() => {
+      setRetryCount((current) => current + 1);
+      runGeneration(generatedConfig || config, { retrying: true });
+    }, 1600);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [config, generatedConfig, generationStatus, isGenerating, retryCount]);
+
+  useEffect(() => {
+    if (generationStatus !== "failed") return undefined;
+
+    if (generatedConfig || generatedDemoId) {
+      setIsGenerated(true);
+      setShowLogic(true);
+    }
+    return undefined;
+  }, [generatedConfig, generatedDemoId, generationStatus]);
+
   return (
     <Shell
-      eyebrow="Create Test"
-      title="生成一套适合被转发的测试。"
+      eyebrow="人格测试生成器"
+      title="生成一套适合被转发的人格测试。"
       description="选一个你想要的主题，我们会把它变成一套有记忆点、有讨论度、也有分享冲动的测试。做完的人拿到的不是冷冰冰的结论，而是一句会让人想立刻转发出去的自我介绍。"
       navMeta="选择内容 · 生成测试"
     >
@@ -420,6 +739,7 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
                 onChange={(event) => updateConfig({ typeCount: Number(event.target.value) })}
               >
                 <option value={4}>4 种</option>
+                <option value={8}>8 种</option>
                 <option value={16}>16 种</option>
                 <option value={32}>32 种</option>
               </select>
@@ -449,8 +769,8 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
 
         {isGenerating && (
           <GenerationProgressCard
-            currentStep={generationStepIndex}
-            stage={generationStage === "copy" ? "正在润色分享结果" : generationStage === "skeleton" ? "正在写出测试雏形" : "正在生成"}
+            testName={draftTestName}
+            configLike={config}
           />
         )}
 
@@ -458,12 +778,10 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
           <section className="panel generate-focus">
             <div className="generate-focus-head compact">
               <div>
-                <div className="system-badge">已生成</div>
-                <h2>测试入口已经准备好了</h2>
+                <div className="system-badge">人格测试</div>
+                <h2>「{generatedTestName}」已经准备好了</h2>
                 <p className="sub">
-                  {generationStatus === "drafting"
-                    ? "现在就能把它发出去。测试题和人格结果已经可用，分享页正在后台继续打磨。"
-                    : "现在就能把它发出去。别人点开后会直接开始测试，不会先被一堆解释劝退。"}
+                  {getGeneratedSubcopy(generationStatus, generationStage, generatedConfig || config)}
                 </p>
               </div>
             </div>
@@ -471,35 +789,47 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
             <div className="generate-summary-row">
               <span>{generated.types.length} 种人格</span>
               <span>{generated.questions.length} 道题</span>
-              <span>{generationStatus === "drafting" ? "结果卡补全中" : "已生成分型逻辑"}</span>
+              <span>{generationStatus === "drafting" ? getDraftingSummaryLabel(generationStage) : "完整版已就绪"}</span>
             </div>
 
             {generationStatus === "drafting" ? (
               <div className="generation-inline-note">
-                <strong>结果卡还在继续打磨。</strong>
-                <span>你现在可以先预览或分享测试入口，页面会自动拿到后续补全后的更完整版本。</span>
+                <strong>{getDraftingNote(generationStage, generatedConfig || config).title}</strong>
+                <span>{getDraftingNote(generationStage, generatedConfig || config).body}</span>
+              </div>
+            ) : null}
+
+            {generationStatus === "retrying" ? (
+              <div className="generation-inline-note">
+                <strong>结果卡补全刚刚断了一下，正在自动重试。</strong>
+                <span>不用重新填写参数，我们先帮你再补一轮；如果还是失败，你也可以手动再试一次。</span>
               </div>
             ) : null}
 
             {generationStatus === "failed" ? (
               <div className="generation-inline-note warning">
-                <strong>完整版结果卡补全失败了。</strong>
-                <span>基础测试仍然可用，你也可以稍后再重新生成一次。</span>
+                <strong>完整版结果卡暂时没有补全成功。</strong>
+                <span>基础测试仍然可用。我们已经自动重试 {retryCount} 次，你也可以手动再试一次。</span>
               </div>
             ) : null}
 
             <div className="actions">
               <button type="button" className="secondary" onClick={() => onOpenTest(generated.shareLink)}>预览测试</button>
               <button type="button" className="primary" onClick={() => onCopyLink(generated.shareLink)}>{copyLabel === "复制测试入口" ? "分享测试" : copyLabel}</button>
+              {generationStatus === "failed" ? (
+                <button type="button" className="secondary" onClick={handleRetry} disabled={isGenerating || isRetrying}>
+                  {isGenerating || isRetrying ? "正在重试..." : "重新补全结果卡"}
+                </button>
+              ) : null}
               <button type="button" className="ghost" onClick={() => setShowLogic((value) => !value)}>
-                {showLogic ? "收起生成逻辑" : "查看生成逻辑"}
+                {showLogic ? "收起生成结果" : "查看生成结果"}
               </button>
             </div>
 
             {showLogic && (
               <section className="logic-panel top-gap">
                 <div className="logic-head">
-                  <h3>{generated.logicTitle}</h3>
+                  <h3>这是「{generatedTestName}」生成出来的结果框架</h3>
                   <p>{generated.logicIntro}</p>
                 </div>
 
@@ -509,11 +839,17 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
                       <strong>{axis.label}</strong>
                       <div className="logic-axis-sides">
                         <div>
-                          <span>{axis.left}</span>
+                          <div className="axis-side-heading">
+                            {axis.leftCode ? <span className="axis-code-pill">{axis.leftCode}</span> : null}
+                            <span>{axis.left}</span>
+                          </div>
                           <p>{axis.leftDescription}</p>
                         </div>
                         <div>
-                          <span>{axis.right}</span>
+                          <div className="axis-side-heading">
+                            {axis.rightCode ? <span className="axis-code-pill">{axis.rightCode}</span> : null}
+                            <span>{axis.right}</span>
+                          </div>
                           <p>{axis.rightDescription}</p>
                         </div>
                       </div>
@@ -525,9 +861,11 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
                 <div className="logic-type-grid">
                   {generated.logicTypes.map((type) => (
                     <article key={type.id} className="logic-type-card">
-                      <div className="logic-type-code">{type.code}</div>
+                      {type.code ? <span className="type-code">{type.code}</span> : null}
                       <strong>{type.name}</strong>
                       <p>{type.tagline}</p>
+                      {type.lens ? <p className="logic-type-detail">{type.lens}</p> : null}
+                      {type.advice ? <p className="logic-type-note">{type.advice}</p> : null}
                     </article>
                   ))}
                 </div>
@@ -586,6 +924,7 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
     () => (config ? buildGenerated(config, getBaseUrl(), demoId ? { demoId } : {}) : null),
     [config, demoId]
   );
+  const testName = useMemo(() => buildTestName(config), [config]);
   const result = useMemo(() => (generated ? buildResult(generated, answers) : null), [generated, answers]);
   const answeredCount = useMemo(
     () => (generated ? generated.questions.filter((question) => answers[question.id]).length : 0),
@@ -599,9 +938,14 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
     () => (generated && result ? buildResultNarrative(generated, result, participantName.trim() || "这位测试者") : null),
     [generated, result, participantName]
   );
+  const resultCodeLegend = useMemo(
+    () => (primaryType && generated ? buildTypeCodeLegend(primaryType.code, generated.logicAxes) : []),
+    [generated, primaryType]
+  );
   const resultPayload = showResult && primaryType && narrative
     ? {
         viewerName: participantName.trim() || "这位测试者",
+        testName,
         type: primaryType,
         secondary: result.secondary?.type || null,
         headline: narrative.heading,
@@ -614,17 +958,37 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
         matchBody: narrative.matchBody,
         storyTitle: narrative.storyTitle,
         examples: narrative.examples,
-        footerLine: narrative.footerLine
+        footerLine: narrative.footerLine,
+        logicAxes: generated.logicAxes
       }
     : null;
   const resultShareLink = resultPayload ? `${getBaseUrl()}?result=${safeEncode(resultPayload)}` : "";
   const copyLabel = copyState === "success" ? "已复制" : copyState === "error" ? "复制失败" : "复制结果页";
 
+  useEffect(() => {
+    if (isLoading) {
+      document.title = buildDocumentTitle(`正在加载「${demoId ? "这套人格测试" : buildTestName(initialConfig)}」`);
+      return;
+    }
+
+    if (loadError || !config) {
+      document.title = buildDocumentTitle(`「${testName}」暂时打不开`);
+      return;
+    }
+
+    if (showResult && primaryType) {
+      document.title = buildDocumentTitle(`「${testName}」结果：${primaryType.name}`);
+      return;
+    }
+
+    document.title = buildDocumentTitle(`开始做「${testName}」`);
+  }, [config, demoId, initialConfig, isLoading, loadError, primaryType, showResult, testName]);
+
   if (isLoading) {
     return (
       <Shell
-        eyebrow="Take Test"
-        title="正在加载这套测试。"
+        eyebrow="人格测试"
+        title={`正在加载「${demoId ? "这套人格测试" : buildTestName(initialConfig)}」`}
         description="马上就好，我们正在把这套结果卡对应的题目和类型取回来。"
         mode="compact"
         navMeta={null}
@@ -641,8 +1005,8 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
   if (!config || loadError) {
     return (
       <Shell
-        eyebrow="Take Test"
-        title="这套测试暂时打不开。"
+        eyebrow="人格测试"
+        title={`「${testName}」暂时打不开。`}
         description={loadError || "链接可能已经失效，或者这套测试还没准备完整。"}
         mode="compact"
         navMeta={null}
@@ -671,8 +1035,8 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
 
   return (
     <Shell
-      eyebrow="Take Test"
-      title="用几分钟完成这组问题。"
+      eyebrow="人格测试"
+      title={`开始做「${testName}」`}
       description="你只需要专注回答这些陈述。完成之后，系统会基于人格维度结果生成一张适合分享的结果卡。"
       mode="compact"
       navMeta={null}
@@ -680,12 +1044,12 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
       <section className="single-column top-gap test-layout">
         <section className="panel test-panel">
           <div className="title-wrap">
-            <div>
-              <div className="system-badge">开始测试</div>
-              <h2>用几分钟完成这组问题</h2>
-              <p className="sub">按照“像不像你”的程度作答即可。</p>
+              <div>
+                <div className="system-badge">开始测试</div>
+                <h2>开始做「{testName}」</h2>
+                <p className="sub">按照“像不像你”的程度作答即可。</p>
+              </div>
             </div>
-          </div>
 
           <div className="progress-card">
             <div className="progress-meta">
@@ -736,15 +1100,22 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
             <div className="title-wrap">
               <div>
                 <div className="system-badge">测试结果</div>
-                <h2>{participantName.trim() ? `${participantName.trim()}，你的结果已经生成了` : "你的结果已经生成了"}</h2>
+                <h2>{participantName.trim() ? `${participantName.trim()}，你的「${testName}」结果已经生成了` : `你的「${testName}」结果已经生成了`}</h2>
                 <p className="sub">这张结果卡更适合被分享。页面不会展示你的作答过程。</p>
               </div>
             </div>
 
             <ShareBanner
-              code={primaryType.code}
               name={primaryType.name}
-              tagline={narrative.wittySummary}
+              tagline={`${narrative.wittySummary}${narrative.footerLine ? ` ${narrative.footerLine}` : ""}`}
+              code={primaryType.code}
+              codeLegend={resultCodeLegend}
+            />
+
+            <AxisCodeGuide
+              logicAxes={generated.logicAxes}
+              title="结果字母怎么读"
+              description="每个缩写都对应你在这套测试里更偏向的一侧，分享时别人也能一眼看懂。"
             />
 
             <div className="answer-grid top-gap">
@@ -777,9 +1148,6 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
                 ))}
               </div>
             </section>
-
-            <div className="result-footer-note">{narrative.footerLine}</div>
-
             <div className="actions top-gap">
               <button type="button" className="primary" onClick={() => onCopyLink(resultShareLink)}>{copyLabel === "复制结果页" ? "分享结果" : copyLabel}</button>
             </div>
@@ -793,12 +1161,18 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
 function PublicResultPage({ payload, currentHref, copyState, onCopyLink }) {
   const shareLabel = copyState === "success" ? "已复制" : copyState === "error" ? "复制失败" : "分享结果";
   const viewerName = payload.viewerName && payload.viewerName !== "这位测试者" ? payload.viewerName : "";
-  const resultHeadline = viewerName ? `${viewerName} 的结果卡` : payload.headline;
+  const publicTestName = payload.testName || "人格测试";
+  const resultHeadline = viewerName ? `${viewerName} 的「${publicTestName}」结果` : payload.headline;
+  const publicCodeLegend = buildTypeCodeLegend(payload.type.code, payload.logicAxes || []);
+
+  useEffect(() => {
+    document.title = buildDocumentTitle(viewerName ? `${viewerName} 的「${publicTestName}」结果卡` : `「${publicTestName}」结果卡`);
+  }, [publicTestName, viewerName]);
 
   return (
     <Shell
-      eyebrow="Share Result"
-      title="这是一张可以直接转发的结果卡。"
+      eyebrow="人格测试结果"
+      title={`这是一张「${publicTestName}」的结果卡。`}
       description="这里不会展示作答过程，只保留结果本身。看完之后，也可以继续生成自己的测试。"
       mode="compact"
       navMeta={null}
@@ -810,15 +1184,22 @@ function PublicResultPage({ payload, currentHref, copyState, onCopyLink }) {
             <div>
               <div className="system-badge">分享结果</div>
               <h2>{resultHeadline}</h2>
-              {viewerName ? <p className="sub">{viewerName} 做完这套测试后，拿到的是这张结果卡。</p> : null}
+              {viewerName ? <p className="sub">{viewerName} 做完「{publicTestName}」后，拿到的是这张结果卡。</p> : null}
               <p className="sub">适合直接截图、转发、继续扩散。</p>
             </div>
           </div>
 
           <ShareBanner
-            code={payload.type.code}
             name={payload.type.name}
-            tagline={payload.summary}
+            tagline={`${payload.summary}${payload.footerLine ? ` ${payload.footerLine}` : ""}`}
+            code={payload.type.code}
+            codeLegend={publicCodeLegend}
+          />
+
+          <AxisCodeGuide
+            logicAxes={payload.logicAxes || []}
+            title="结果字母怎么读"
+            description="这张结果卡里的每个字母，都对应这套测试的一条判断维度。"
           />
 
           <div className="answer-grid top-gap">
@@ -851,9 +1232,6 @@ function PublicResultPage({ payload, currentHref, copyState, onCopyLink }) {
               ))}
             </div>
           </section>
-
-          <div className="result-footer-note">{payload.footerLine}</div>
-
           <div className="actions top-gap">
             <button type="button" className="primary" onClick={() => onCopyLink(currentHref)}>{shareLabel}</button>
           </div>

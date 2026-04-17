@@ -121,10 +121,12 @@ app.post("/api/personality-tests/generate", async (req, res) => {
     const config = req.body || {};
     const id = generateGeneratedTestId();
     const startedAt = Date.now();
+    const generationStartedAt = Date.now();
     console.log(
       `[personality-tests] request id=${id} school=${config.schoolId || "unknown"} direction=${Array.isArray(config.directionIds) ? config.directionIds[0] || "custom" : "custom"} custom=${config.customDirection ? "yes" : "no"} typeCount=${config.typeCount || 16} questionCount=${config.questionCount || 20}`
     );
     const generatedSystem = await generatePersonalitySystem(config, { mode: "quick" });
+    const generationDuration = Date.now() - generationStartedAt;
     const payload = {
       config: {
         schoolId: config.schoolId,
@@ -135,17 +137,19 @@ app.post("/api/personality-tests/generate", async (req, res) => {
       },
       generatedSystem,
       generationStatus: "drafting",
-      generationStage: "skeleton",
+      generationStage: "copy",
       generationError: ""
     };
 
+    const saveStartedAt = Date.now();
     await saveGeneratedTest(id, payload);
+    const saveDuration = Date.now() - saveStartedAt;
     console.log(
-      `[personality-tests] quick-ready id=${id} duration_ms=${Date.now() - startedAt}`
+      `[personality-tests] quick-ready id=${id} duration_ms=${Date.now() - startedAt} generate_ms=${generationDuration} save_ms=${saveDuration}`
     );
     res.json({ id, generatedSystem, generationStatus: payload.generationStatus, generationStage: payload.generationStage });
 
-    void enrichGeneratedTest(id, payload.config).catch((error) => {
+    void enrichGeneratedTest(id, payload.config, generatedSystem).catch((error) => {
       console.error(`Failed to enrich generated test ${id}:`, error);
     });
   } catch (error) {
@@ -359,30 +363,51 @@ async function getGeneratedTest(id) {
   }
 }
 
-async function enrichGeneratedTest(id, config) {
+async function enrichGeneratedTest(id, config, seedSystem = null) {
   const startedAt = Date.now();
-  await updateGeneratedTest(id, (current) => ({
-    ...current,
-    generationStatus: "drafting",
-    generationStage: "copy"
-  }));
   console.log(`[personality-tests] enrich-start id=${id}`);
 
   try {
-    const generatedSystem = await generatePersonalitySystem(config, { mode: "full" });
+    const copyStartedAt = Date.now();
+    const copySystem = await generatePersonalitySystem(
+      {
+        ...config,
+        generatedSystem: seedSystem || null
+      },
+      { mode: "copy" }
+    );
     await updateGeneratedTest(id, (current) => ({
       ...current,
-      generatedSystem,
+      generatedSystem: copySystem,
+      generationStatus: "drafting",
+      generationStage: "examples",
+      generationError: ""
+    }));
+    console.log(`[personality-tests] enrich-copy-ready id=${id} duration_ms=${Date.now() - copyStartedAt}`);
+
+    const examplesStartedAt = Date.now();
+    const enrichedSystem = await generatePersonalitySystem(
+      {
+        ...config,
+        generatedSystem: copySystem
+      },
+      { mode: "examples" }
+    );
+    await updateGeneratedTest(id, (current) => ({
+      ...current,
+      generatedSystem: enrichedSystem,
       generationStatus: "ready",
       generationStage: "ready",
       generationError: ""
     }));
-    console.log(`[personality-tests] enrich-ready id=${id} duration_ms=${Date.now() - startedAt}`);
+    console.log(
+      `[personality-tests] enrich-ready id=${id} duration_ms=${Date.now() - startedAt} examples_ms=${Date.now() - examplesStartedAt}`
+    );
   } catch (error) {
     await updateGeneratedTest(id, (current) => ({
       ...current,
       generationStatus: "failed",
-      generationStage: "copy",
+      generationStage: current?.generationStage || "copy",
       generationError: error.message || "结果卡补全失败"
     }));
     console.error(`[personality-tests] enrich-failed id=${id}:`, error);

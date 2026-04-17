@@ -63,7 +63,119 @@ const directionGuides = {
   }
 };
 
-const outputSchema = {
+const axisSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "label", "leftKey", "leftLabel", "leftDescription", "rightKey", "rightLabel", "rightDescription"],
+  properties: {
+    id: { type: "string" },
+    label: { type: "string" },
+    leftKey: { type: "string" },
+    leftLabel: { type: "string" },
+    leftDescription: { type: "string" },
+    rightKey: { type: "string" },
+    rightLabel: { type: "string" },
+    rightDescription: { type: "string" }
+  }
+};
+
+const questionsByAxisSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["axisId", "left", "right"],
+  properties: {
+    axisId: { type: "string" },
+    left: { type: "array", items: { type: "string" } },
+    right: { type: "array", items: { type: "string" } }
+  }
+};
+
+const exampleSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "why", "story"],
+  properties: {
+    name: { type: "string" },
+    why: { type: "string" },
+    story: { type: "string" }
+  }
+};
+
+const skeletonArchetypeSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "code", "name", "tagline", "traits", "signatureSides"],
+  properties: {
+    id: { type: "string" },
+    code: { type: "string" },
+    name: { type: "string" },
+    tagline: { type: "string" },
+    traits: { type: "array", items: { type: "string" } },
+    signatureSides: {
+      type: "array",
+      items: {
+        type: "string",
+        enum: ["left", "right"]
+      }
+    }
+  }
+};
+
+const copyPatchArchetypeSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code", "name", "tagline", "lens", "advice", "risk"],
+  properties: {
+    code: { type: "string" },
+    name: { type: "string" },
+    tagline: { type: "string" },
+    lens: { type: "string" },
+    advice: { type: "string" },
+    risk: { type: "string" }
+  }
+};
+
+const examplesPatchArchetypeSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code", "examples"],
+  properties: {
+    code: { type: "string" },
+    examples: {
+      type: "array",
+      items: exampleSchema
+    }
+  }
+};
+
+const fullArchetypeSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "code", "name", "tagline", "traits", "lens", "advice", "risk", "signatureSides", "examples"],
+  properties: {
+    id: { type: "string" },
+    code: { type: "string" },
+    name: { type: "string" },
+    tagline: { type: "string" },
+    traits: { type: "array", items: { type: "string" } },
+    lens: { type: "string" },
+    advice: { type: "string" },
+    risk: { type: "string" },
+    signatureSides: {
+      type: "array",
+      items: {
+        type: "string",
+        enum: ["left", "right"]
+      }
+    },
+    examples: {
+      type: "array",
+      items: exampleSchema
+    }
+  }
+};
+
+const skeletonOutputSchema = {
   type: "object",
   additionalProperties: false,
   required: [
@@ -92,72 +204,102 @@ const outputSchema = {
     matchTitle: { type: "string" },
     axes: {
       type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["id", "label", "leftKey", "leftLabel", "leftDescription", "rightKey", "rightLabel", "rightDescription"],
-        properties: {
-          id: { type: "string" },
-          label: { type: "string" },
-          leftKey: { type: "string" },
-          leftLabel: { type: "string" },
-          leftDescription: { type: "string" },
-          rightKey: { type: "string" },
-          rightLabel: { type: "string" },
-          rightDescription: { type: "string" }
-        }
-      }
+      items: axisSchema
     },
     questionsByAxis: {
       type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["axisId", "left", "right"],
-        properties: {
-          axisId: { type: "string" },
-          left: { type: "array", items: { type: "string" } },
-          right: { type: "array", items: { type: "string" } }
-        }
-      }
+      items: questionsByAxisSchema
     },
     archetypes: {
       type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["id", "code", "name", "tagline", "traits", "lens", "advice", "risk", "signatureSides", "examples"],
-        properties: {
-          id: { type: "string" },
-          code: { type: "string" },
-          name: { type: "string" },
-          tagline: { type: "string" },
-          traits: { type: "array", items: { type: "string" } },
-          lens: { type: "string" },
-          advice: { type: "string" },
-          risk: { type: "string" },
-          signatureSides: {
-            type: "array",
-            items: {
-              type: "string",
-              enum: ["left", "right"]
-            }
-          },
-          examples: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["name", "why", "story"],
-              properties: {
-                name: { type: "string" },
-                why: { type: "string" },
-                story: { type: "string" }
-              }
-            }
-          }
-        }
-      }
+      items: skeletonArchetypeSchema
+    }
+  }
+};
+
+const copyPatchSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "title",
+    "intro",
+    "logicTitle",
+    "logicIntro",
+    "resultNoun",
+    "playfulLine",
+    "storyTitle",
+    "matchTitle",
+    "archetypes"
+  ],
+  properties: {
+    title: { type: "string" },
+    intro: { type: "string" },
+    logicTitle: { type: "string" },
+    logicIntro: { type: "string" },
+    resultNoun: { type: "string" },
+    playfulLine: { type: "string" },
+    storyTitle: { type: "string" },
+    matchTitle: { type: "string" },
+    archetypes: {
+      type: "array",
+      items: copyPatchArchetypeSchema
+    }
+  }
+};
+
+const examplesPatchSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["playfulLine", "storyTitle", "matchTitle", "archetypes"],
+  properties: {
+    playfulLine: { type: "string" },
+    storyTitle: { type: "string" },
+    matchTitle: { type: "string" },
+    archetypes: {
+      type: "array",
+      items: examplesPatchArchetypeSchema
+    }
+  }
+};
+
+const fullOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "typeCount",
+    "title",
+    "intro",
+    "logicTitle",
+    "logicIntro",
+    "resultNoun",
+    "playfulLine",
+    "storyTitle",
+    "matchTitle",
+    "axes",
+    "questionsByAxis",
+    "archetypes"
+  ],
+  properties: {
+    typeCount: { type: "integer" },
+    title: { type: "string" },
+    intro: { type: "string" },
+    logicTitle: { type: "string" },
+    logicIntro: { type: "string" },
+    resultNoun: { type: "string" },
+    playfulLine: { type: "string" },
+    storyTitle: { type: "string" },
+    matchTitle: { type: "string" },
+    axes: {
+      type: "array",
+      items: axisSchema
+    },
+    questionsByAxis: {
+      type: "array",
+      items: questionsByAxisSchema
+    },
+    archetypes: {
+      type: "array",
+      items: fullArchetypeSchema
     }
   }
 };
@@ -165,6 +307,7 @@ const outputSchema = {
 function getAxisCount(typeCount) {
   if (Number(typeCount) >= 32) return 5;
   if (Number(typeCount) >= 16) return 4;
+  if (Number(typeCount) >= 8) return 3;
   return 2;
 }
 
@@ -244,11 +387,42 @@ function buildSystemPrompt() {
 `.trim();
 }
 
+function buildExistingSystemSummary(generatedSystem) {
+  if (!generatedSystem || typeof generatedSystem !== "object") return "";
+
+  const summary = {
+    title: generatedSystem.title || "",
+    resultNoun: generatedSystem.resultNoun || "",
+    axes: Array.isArray(generatedSystem.axes)
+      ? generatedSystem.axes.map((axis) => ({
+          id: axis.id,
+          label: axis.label,
+          left: {
+            code: axis.left?.code || axis.left?.key || "",
+            label: axis.left?.label || ""
+          },
+          right: {
+            code: axis.right?.code || axis.right?.key || "",
+            label: axis.right?.label || ""
+          }
+        }))
+      : [],
+    archetypes: Array.isArray(generatedSystem.archetypes)
+      ? generatedSystem.archetypes.map((type) => ({
+          code: type.code || "",
+          name: type.name || "",
+          signature: type.signature || {}
+        }))
+      : []
+  };
+
+  return JSON.stringify(summary, null, 2);
+}
+
 function buildUserPrompt(input, mode = "full") {
   const directionId = Array.isArray(input.directionIds) ? input.directionIds[0] : input.directionIds;
   const school = schoolFrames[input.schoolId] || schoolFrames.act;
   const builtInDirection = directionGuides[directionId];
-  const themeLabel = (input.customDirection || "").trim() || builtInDirection?.label || "自定义主题";
   const themeHint = input.customDirection
     ? "这是用户自定义主题。你需要先判断这个圈层最适合用什么识别单位分类，再长出结果。"
     : builtInDirection?.hint || "请先找到这个主题里圈内人一眼能懂的识别单位。";
@@ -256,10 +430,8 @@ function buildUserPrompt(input, mode = "full") {
   const typeCount = Number(input.typeCount) || 16;
   const questionCount = Number(input.questionCount) || 20;
   const axisCount = getAxisCount(typeCount);
-  const isQuickMode = mode === "quick";
-  return `
-请生成一套完整的人格测试系统。
-
+  const existingSystemSummary = mode === "quick" ? "" : buildExistingSystemSummary(input.generatedSystem);
+  const baseContext = `
 输入参数：
 {
   "psychology_school": "${school.label}",
@@ -267,38 +439,36 @@ function buildUserPrompt(input, mode = "full") {
   "custom_theme": "${(input.customDirection || "").trim()}",
   "type_count": ${typeCount},
   "question_count": ${questionCount},
+  "axis_count": ${axisCount},
   "language": "zh-CN"
 }
 
-补充要求：
+共同要求：
 1. 如果 custom_theme 不为空，以 custom_theme 为准。
-2. 如果 direction_theme 是内置主题，必须使用该主题对应的圈层识别单位来设计人格。
-3. 人格命名必须有传播感，最好让人一看就想分享。
-4. 结果页文案要像面向用户的内容卡，不要像系统说明。
-5. 题目必须真的服务于分型，不要为了有趣牺牲区分度。
-6. 同一主题的人格解释框架要体现「${school.label}」的视角差异：${school.frame}
-7. 请严格按照传入的 type_count 输出人格数量。
-8. 请严格按照传入的 question_count 输出题目数量。
-9. 题目要覆盖所有维度，尽量平均分布。
-10. 当前主题提示：${themeHint}
-11. 如果 type_count = 16，则必须输出 4 条轴线、16 个 archetypes。
-12. 如果 type_count = 32，则必须输出 5 条轴线、32 个 archetypes。
-13. 如果输出数量不符，视为失败，请自行修正后再输出。
+2. 如果 direction_theme 是内置主题，必须使用该主题对应的圈层识别单位。
+3. 同一主题的人格解释框架要体现「${school.label}」的视角差异：${school.frame}
+4. 当前主题提示：${themeHint}
+5. leftKey / rightKey 请尽量使用 1 到 3 个大写英文字母缩写；leftLabel / rightLabel 再写完整中文名。
+6. archetype 的 name 不能直接把轴线两端标签硬拼在一起，也不要写成“结果 1 / 类型 1”。
+7. 如果输出数量不符，视为失败，请自行修正后再输出。
+`.trim();
 
-生成阶段：
-- 当前阶段是：${isQuickMode ? "快速骨架生成" : "完整结果卡补全"}
-- ${isQuickMode
-    ? "这一阶段优先保证题目、轴线、类型、基础分型逻辑先可用。文案可以短一点，但字段必须完整。每个 archetype 的 lens / advice / risk 各写 1 句，examples 先给 1 个最像的。"
-    : "这一阶段要在已经有题目和类型骨架的前提下，把结果卡文案补满。每个 archetype 的 lens / advice / risk 要更完整、更适合分享，examples 要补到 3 个。builder 区域 copy 也要更像营销内容。"}
+  if (mode === "quick") {
+    return `
+请先生成一套“可预览版骨架”。目标是尽快产出可分享、可做题、可预览的测试骨架，不要把时间花在长文案和例子上。
 
-文案风格附加要求：
-- 结果命名要像社交货币
-- summary 要像“别人会转发的内容”
-- blunt_truth 要更直接一点，有一点幽默感
-- examples 要尽量使用用户一眼能认出来的人物、作品、品种、角色
-- 不能只是好听，必须像
+${baseContext}
 
-为了兼容当前前端，请严格按下面这个 JSON 结构输出，不要改字段名：
+这一阶段只做这些事：
+1. 产出完整的测试标题和基础简介。
+2. 产出 ${axisCount} 条轴线。
+3. 每条轴线左右各写 3 道题。
+4. 产出 ${typeCount} 个 archetypes，但只保留骨架字段：id / code / name / tagline / traits / signatureSides。
+5. tagline 只要 1 句短的，traits 只要 2 到 3 个词。
+6. 不要输出 lens / advice / risk / examples，这些留到后续补全阶段。
+7. title、intro、logicTitle、logicIntro、resultNoun、playfulLine、storyTitle、matchTitle 都可以简短，但要能直接给用户看。
+
+请严格按下面这个 JSON 结构输出，不要改字段名：
 {
   "typeCount": ${typeCount},
   "title": "",
@@ -335,12 +505,88 @@ function buildUserPrompt(input, mode = "full") {
       "name": "",
       "tagline": "",
       "traits": ["", "", ""],
+      "signatureSides": ["left", "right"]
+    }
+  ]
+}
+
+校验：
+- axes 数量必须等于 ${axisCount}
+- questionsByAxis 数量必须等于 ${axisCount}
+- archetypes 数量必须等于 ${typeCount}
+- 每条轴线左右各 3 道题
+- signatureSides 必须和 axes 顺序一一对应
+`.trim();
+  }
+
+  if (mode === "copy") {
+    return `
+请基于下面这份已经可用的“测试骨架摘要”，只补全结果页文案，不要推翻已有分型体系，不要改 code / signature 对应关系。
+
+${baseContext}
+
+当前骨架摘要：
+${existingSystemSummary}
+
+这一阶段只做这些事：
+1. 补 title、intro、logicTitle、logicIntro、resultNoun、playfulLine、storyTitle、matchTitle 的正式文案。
+2. 为每个 archetype 补 name、tagline、lens、advice、risk。
+3. 文案要更像用户会分享出去的结果卡，但仍然保持和骨架一致。
+4. 不要输出 axes 和 questionsByAxis。
+5. 不要输出 examples，这一块留到下一阶段。
+
+请严格按下面这个 JSON 结构输出：
+{
+  "title": "",
+  "intro": "",
+  "logicTitle": "",
+  "logicIntro": "",
+  "resultNoun": "",
+  "playfulLine": "",
+  "storyTitle": "",
+  "matchTitle": "",
+  "archetypes": [
+    {
+      "code": "",
+      "name": "",
+      "tagline": "",
       "lens": "",
       "advice": "",
-      "risk": "",
-      "signatureSides": ["left", "right"],
+      "risk": ""
+    }
+  ]
+}
+
+校验：
+- archetypes 数量必须等于 ${typeCount}
+- 每个 code 必须能和骨架里的 archetype 一一对应
+`.trim();
+  }
+
+  if (mode === "examples") {
+    return `
+请基于下面这份已经可用的“测试骨架摘要”，只补全 examples 和分享增强文案，不要改分型结构。
+
+${baseContext}
+
+当前骨架摘要：
+${existingSystemSummary}
+
+这一阶段只做这些事：
+1. 微调 playfulLine、storyTitle、matchTitle，让分享表达更顺。
+2. 为每个 archetype 补 2 到 3 个 examples。
+3. examples 必须是用户一眼能认出来的人物、角色、品种、作品或组织位置。
+4. 不要输出 axes、questionsByAxis，也不要重写 lens / advice / risk。
+
+请严格按下面这个 JSON 结构输出：
+{
+  "playfulLine": "",
+  "storyTitle": "",
+  "matchTitle": "",
+  "archetypes": [
+    {
+      "code": "",
       "examples": [
-        { "name": "", "why": "", "story": "" },
         { "name": "", "why": "", "story": "" },
         { "name": "", "why": "", "story": "" }
       ]
@@ -348,12 +594,23 @@ function buildUserPrompt(input, mode = "full") {
   ]
 }
 
-额外校验：
-- axes 数量必须等于 ${axisCount}
+校验：
 - archetypes 数量必须等于 ${typeCount}
-- questionsByAxis 数量必须等于 ${axisCount}
-- 每条轴线左右各 3 道题
-- signatureSides 必须和 axes 顺序一一对应
+- 每个 code 必须能和骨架里的 archetype 一一对应
+`.trim();
+  }
+
+  return `
+请生成一套完整的人格测试系统。
+
+${baseContext}
+
+下面会给你一份已经生成好的骨架。完整模式下请优先保留这套骨架的轴线结构、题目方向、类型 code / signature 对应关系，只把文案补得更完整、更适合分享，不要整体推翻重做。
+
+这是已经可用的骨架摘要，请沿着它润色：
+${existingSystemSummary}
+
+请严格按完整 JSON 结构输出，补齐 title、intro、logicTitle、logicIntro、resultNoun、playfulLine、storyTitle、matchTitle、axes、questionsByAxis、archetypes、examples 全部字段。
 `.trim();
 }
 
@@ -391,6 +648,13 @@ function extractChatCompletionText(responseJson) {
 
 function isMoonshotBaseUrl() {
   return /moonshot\.cn/i.test(OPENAI_BASE_URL);
+}
+
+function getSchemaForMode(mode) {
+  if (mode === "quick") return skeletonOutputSchema;
+  if (mode === "copy") return copyPatchSchema;
+  if (mode === "examples") return examplesPatchSchema;
+  return fullOutputSchema;
 }
 
 function sleep(ms) {
@@ -507,25 +771,254 @@ function getAllSignatureKeys(axisCount, expectedTypeCount) {
   );
 }
 
+const fallbackArchetypePrefixes = [
+  "开路",
+  "定盘",
+  "穿透",
+  "稳场",
+  "探路",
+  "控局",
+  "织网",
+  "破局"
+];
+
+const fallbackArchetypeRoles = [
+  "引擎",
+  "灯塔",
+  "信号员",
+  "校准者",
+  "架桥人",
+  "操盘手",
+  "观察者",
+  "编排者"
+];
+
+function resolveExpectedAxisCount(raw) {
+  const explicitTypeCount = Number(raw?.typeCount);
+  if (explicitTypeCount) {
+    return getAxisCount(explicitTypeCount);
+  }
+
+  const rawAxisCount = Array.isArray(raw?.axes) ? raw.axes.length : 0;
+  if (rawAxisCount >= 2 && rawAxisCount <= 5) {
+    return rawAxisCount;
+  }
+
+  const rawArchetypeCount = Array.isArray(raw?.archetypes) ? raw.archetypes.length : 0;
+  if (rawArchetypeCount) {
+    return getAxisCount(rawArchetypeCount);
+  }
+
+  return getAxisCount(16);
+}
+
+function resolveExpectedTypeCount(raw, axisCount) {
+  const explicitTypeCount = Number(raw?.typeCount);
+  if (explicitTypeCount) {
+    return getExpectedTypeCount(explicitTypeCount, axisCount);
+  }
+
+  const rawArchetypeCount = Array.isArray(raw?.archetypes) ? raw.archetypes.length : 0;
+  if (rawArchetypeCount) {
+    return getExpectedTypeCount(rawArchetypeCount, axisCount);
+  }
+
+  return getExpectedTypeCount(2 ** axisCount, axisCount);
+}
+
+function buildFallbackAxisCode(index, side) {
+  const leftCodes = ["A", "C", "E", "G", "J"];
+  const rightCodes = ["B", "D", "F", "H", "K"];
+  return side === "right" ? rightCodes[index] || `R${index + 1}` : leftCodes[index] || `L${index + 1}`;
+}
+
+function deriveAxisCode(rawValue, label, fallbackCode) {
+  const source = String(rawValue || "").trim();
+  const upperSource = source.toUpperCase();
+  if (/^[A-Z0-9]{1,3}$/.test(upperSource)) {
+    return upperSource;
+  }
+
+  const asciiChunks = source.match(/[A-Za-z0-9]+/g);
+  if (asciiChunks?.length) {
+    const initials = asciiChunks.map((part) => part[0]).join("").slice(0, 3).toUpperCase();
+    if (initials) return initials;
+    return asciiChunks.join("").slice(0, 3).toUpperCase();
+  }
+
+  const labelSource = String(label || "").trim();
+  const labelAsciiChunks = labelSource.match(/[A-Za-z0-9]+/g);
+  if (labelAsciiChunks?.length) {
+    const labelInitials = labelAsciiChunks.map((part) => part[0]).join("").slice(0, 3).toUpperCase();
+    if (labelInitials) return labelInitials;
+  }
+
+  return fallbackCode;
+}
+
+function normalizeAxis(axis = {}, index = 0) {
+  const leftLabel = axis.leftLabel || `左侧 ${index + 1}`;
+  const rightLabel = axis.rightLabel || `右侧 ${index + 1}`;
+  let leftCode = deriveAxisCode(axis.leftKey, leftLabel, buildFallbackAxisCode(index, "left"));
+  let rightCode = deriveAxisCode(axis.rightKey, rightLabel, buildFallbackAxisCode(index, "right"));
+
+  if (leftCode === rightCode) {
+    rightCode = buildFallbackAxisCode(index, "right");
+    if (leftCode === rightCode) {
+      rightCode = `${rightCode}${index + 1}`;
+    }
+  }
+
+  return {
+    id: axis.id || `axis_${index + 1}`,
+    label: axis.label || `维度 ${index + 1}`,
+    left: {
+      key: axis.leftKey || leftCode.toLowerCase(),
+      code: leftCode,
+      label: leftLabel,
+      description: axis.leftDescription || `更偏向 ${leftLabel}`
+    },
+    right: {
+      key: axis.rightKey || rightCode.toLowerCase(),
+      code: rightCode,
+      label: rightLabel,
+      description: axis.rightDescription || `更偏向 ${rightLabel}`
+    }
+  };
+}
+
+function splitTypeCodeTokens(typeCode, axes = []) {
+  const rawCode = String(typeCode || "").trim();
+  if (!rawCode) return [];
+
+  const separated = rawCode
+    .split(/[\s\-_/|·]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+  if (separated.length === axes.length) {
+    return separated;
+  }
+
+  const compact = rawCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  if (!compact) return [];
+
+  const tokens = [];
+  let cursor = 0;
+
+  for (const axis of axes) {
+    const options = [axis.left.code, axis.right.code]
+      .filter(Boolean)
+      .map((token) => String(token).toUpperCase())
+      .sort((a, b) => b.length - a.length);
+    const matched = options.find((option) => compact.slice(cursor).startsWith(option));
+    if (!matched) {
+      return [];
+    }
+    tokens.push(matched);
+    cursor += matched.length;
+  }
+
+  return cursor === compact.length ? tokens : [];
+}
+
+function buildArchetypeCode(signatureSides = [], axes = []) {
+  return axes
+    .map((axis, index) => (signatureSides[index] === "right" ? axis.right.code : axis.left.code))
+    .filter(Boolean)
+    .join("-");
+}
+
+function resolveSignatureSides(type = {}, axes = [], fallbackSignatureKey = "") {
+  const fallbackSides = fallbackSignatureKey
+    ? fallbackSignatureKey.split("").map((value) => (value === "R" ? "right" : "left"))
+    : Array.from({ length: axes.length }, () => "left");
+  const resolved = Array.from({ length: axes.length }, (_, index) => {
+    if (type.signatureSides?.[index] === "left" || type.signatureSides?.[index] === "right") {
+      return type.signatureSides[index];
+    }
+
+    const signatureValue = type.signature?.[axes[index]?.id];
+    if (signatureValue === "left" || signatureValue === "right") {
+      return signatureValue;
+    }
+
+    return null;
+  });
+
+  const codeTokens = splitTypeCodeTokens(type.code, axes);
+  if (codeTokens.length === axes.length) {
+    codeTokens.forEach((token, index) => {
+      if (resolved[index]) return;
+      resolved[index] = token.toUpperCase() === axes[index].right.code.toUpperCase() ? "right" : "left";
+    });
+  }
+
+  return resolved.map((value, index) => value || fallbackSides[index] || "left");
+}
+
+function buildFallbackArchetypeName(signatureKey, index) {
+  const compactKey = String(signatureKey || "");
+  const splitIndex = Math.max(1, Math.ceil(compactKey.length / 2));
+  const prefixBits = compactKey
+    .slice(0, splitIndex)
+    .replaceAll("L", "0")
+    .replaceAll("R", "1");
+  const roleBits = compactKey
+    .slice(splitIndex)
+    .replaceAll("L", "0")
+    .replaceAll("R", "1");
+  const prefixIndex = prefixBits ? parseInt(prefixBits, 2) % fallbackArchetypePrefixes.length : index % fallbackArchetypePrefixes.length;
+  const roleIndex = roleBits ? parseInt(roleBits, 2) % fallbackArchetypeRoles.length : index % fallbackArchetypeRoles.length;
+  return `${fallbackArchetypePrefixes[prefixIndex]}${fallbackArchetypeRoles[roleIndex]}`;
+}
+
+function shouldReplaceArchetypeName(name, pickedLabels = []) {
+  const nextName = String(name || "").trim();
+  if (!nextName) return true;
+  if (/^结果\s*\d+$/i.test(nextName) || /^类型\s*\d+$/i.test(nextName)) return true;
+  if (/(左侧|右侧|人格|类型|组合|维度)/.test(nextName)) return true;
+  const labelHits = pickedLabels.filter((label) => label && nextName.includes(label)).length;
+  return labelHits >= Math.min(2, pickedLabels.length);
+}
+
+function reserveArchetypeName(preferredName, fallbackName, usedNames) {
+  let candidate = String(preferredName || "").trim();
+  if (!candidate || usedNames.has(candidate)) {
+    candidate = String(fallbackName || "").trim() || "未命名人格";
+  }
+
+  if (!usedNames.has(candidate)) {
+    usedNames.add(candidate);
+    return candidate;
+  }
+
+  let suffix = 2;
+  while (usedNames.has(`${candidate}${suffix}`)) {
+    suffix += 1;
+  }
+
+  const uniqueName = `${candidate}${suffix}`;
+  usedNames.add(uniqueName);
+  return uniqueName;
+}
+
 function synthesizeArchetype({ signatureKey, axes, index, title, resultNoun }) {
   const signatureSides = signatureKey.split("").map((value) => (value === "R" ? "right" : "left"));
   const pickedLabels = axes.map((axis, axisIndex) =>
     signatureSides[axisIndex] === "right" ? axis.right.label : axis.left.label
   );
-  const shortPieces = pickedLabels.slice(0, 2);
-  const shortName = shortPieces.join("·") || `结果 ${index + 1}`;
-  const fullName = `${shortName}${resultNoun ? ` ${resultNoun}` : ""}`.trim();
   const traits = pickedLabels.slice(0, 3);
+  const fallbackName = buildFallbackArchetypeName(signatureKey, index);
 
   return {
     id: `type-${signatureKey.toLowerCase()}`,
-    code: signatureKey,
-    name: fullName,
-    tagline: `你更像把 ${pickedLabels.join(" / ")} 这组气质揉在一起的那类人。`,
+    code: buildArchetypeCode(signatureSides, axes),
+    name: fallbackName,
+    tagline: `${fallbackName}这一型，通常会把 ${pickedLabels.join(" / ")} 这组倾向同时带在身上。`,
     traits,
-    lens: `${title || "这套测试"}里，你会自然站到 ${pickedLabels.join("、")} 这一侧，别人也更容易这样记住你。`,
-    advice: `先把 ${pickedLabels[0]} 这面用好，再补足 ${pickedLabels[pickedLabels.length - 1]} 这一侧的弹性。`,
-    risk: `当压力上来时，你可能会把 ${pickedLabels.join("、")} 推得太满，反而显得用力过猛。`,
+    lens: `${title || "这套测试"}里，你往往会自然长成“${fallbackName}”这种存在感：判断有自己的重心，动作也有自己的节奏。`,
+    advice: `先稳住你最拿手的 ${pickedLabels[0]}，再有意识地给 ${pickedLabels[pickedLabels.length - 1]} 留一点弹性，会比一味把优势推满更耐用。`,
+    risk: `当压力上来时，你可能会把 ${pickedLabels.join("、")} 这几面一起踩到底，最后看起来很能扛，但也最容易把自己推到过载。`,
     examples: [],
     signature: Object.fromEntries(
       axes.map((axis, axisIndex) => [axis.id, signatureSides[axisIndex] === "right" ? "right" : "left"])
@@ -534,27 +1027,10 @@ function synthesizeArchetype({ signatureKey, axes, index, title, resultNoun }) {
 }
 
 function normalizeGeneratedSystem(raw) {
-  const expectedAxisCount = getAxisCount(raw.typeCount || raw.archetypes?.length || 16);
-  const expectedTypeCount = getExpectedTypeCount(raw.typeCount, expectedAxisCount);
+  const expectedAxisCount = resolveExpectedAxisCount(raw);
+  const expectedTypeCount = resolveExpectedTypeCount(raw, expectedAxisCount);
 
-  const axes = (raw.axes || []).slice(0, expectedAxisCount).map((axis, index) => ({
-    id: axis.id || `axis_${index + 1}`,
-    label: axis.label || `维度 ${index + 1}`,
-    left: {
-      key: axis.leftKey || `left_${index + 1}`,
-      label: axis.leftLabel || `左侧 ${index + 1}`,
-      description: axis.leftDescription || `更偏向 ${axis.leftLabel || `左侧 ${index + 1}`}`
-    },
-    right: {
-      key: axis.rightKey || `right_${index + 1}`,
-      label: axis.rightLabel || `右侧 ${index + 1}`,
-      description: axis.rightDescription || `更偏向 ${axis.rightLabel || `右侧 ${index + 1}`}`
-    }
-  }));
-
-  if (axes.length !== expectedAxisCount) {
-    throw new Error(`Model did not return ${expectedAxisCount} valid axes.`);
-  }
+  const axes = Array.from({ length: expectedAxisCount }, (_, index) => normalizeAxis(raw.axes?.[index], index));
 
   const questionMap = new Map(
     (raw.questionsByAxis || []).map((item, index) => [
@@ -568,23 +1044,32 @@ function normalizeGeneratedSystem(raw) {
 
   const allSignatureKeys = getAllSignatureKeys(expectedAxisCount, expectedTypeCount);
   const archetypeMap = new Map();
+  const usedNames = new Set();
 
   (raw.archetypes || []).forEach((type, index) => {
-    const signatureSides = Array.from({ length: expectedAxisCount }, (_, axisIndex) =>
-      type.signatureSides?.[axisIndex] === "right" ? "right" : "left"
-    );
+    const fallbackSignatureKey = allSignatureKeys[index] || allSignatureKeys[archetypeMap.size] || "L".repeat(expectedAxisCount);
+    const signatureSides = resolveSignatureSides(type, axes, fallbackSignatureKey);
     const signatureKey = buildSignatureKey(signatureSides, expectedAxisCount);
     if (!signatureKey || archetypeMap.has(signatureKey)) return;
+    const pickedLabels = axes.map((axis, axisIndex) =>
+      signatureSides[axisIndex] === "right" ? axis.right.label : axis.left.label
+    );
+    const fallbackName = buildFallbackArchetypeName(signatureKey, index);
+    const nextName = reserveArchetypeName(
+      shouldReplaceArchetypeName(type.name, pickedLabels) ? "" : type.name,
+      fallbackName,
+      usedNames
+    );
 
     archetypeMap.set(signatureKey, {
-      id: type.id || `${slugify(type.code || type.name || `type-${index + 1}`)}`,
-      code: type.code || signatureKey,
-      name: type.name || `结果 ${index + 1}`,
-      tagline: type.tagline || "",
+      id: type.id || `${slugify(nextName || type.code || `type-${index + 1}`)}`,
+      code: buildArchetypeCode(signatureSides, axes),
+      name: nextName,
+      tagline: type.tagline || `${nextName}这型人，通常会把 ${pickedLabels.join(" / ")} 这组特征同时拉到台前。`,
       traits: Array.isArray(type.traits) ? type.traits.slice(0, 3) : [],
-      lens: type.lens || "",
-      advice: type.advice || "",
-      risk: type.risk || "",
+      lens: type.lens || `${nextName}往往不是最平均的那种人，而是会在 ${pickedLabels.join("、")} 这些侧面上显得特别有辨识度。`,
+      advice: type.advice || `先把你最稳定的 ${pickedLabels[0]} 用成优势，再补一点 ${pickedLabels[pickedLabels.length - 1]} 的回旋空间，会让你更舒服。`,
+      risk: type.risk || `如果一直硬顶，你可能会把 ${pickedLabels.join("、")} 这几种倾向一起开太满，最后变成自己最先累。`,
       examples: Array.isArray(type.examples) ? type.examples.slice(0, 3) : [],
       signature: Object.fromEntries(
         axes.map((axis, axisIndex) => [axis.id, signatureSides[axisIndex] === "right" ? "right" : "left"])
@@ -651,6 +1136,62 @@ function normalizeGeneratedSystem(raw) {
   };
 }
 
+function mapPatchArchetypesByCode(rawArchetypes = []) {
+  return new Map(
+    (Array.isArray(rawArchetypes) ? rawArchetypes : [])
+      .map((item, index) => [String(item?.code || "").trim() || `index-${index}`, item])
+  );
+}
+
+function mergeCopyPatch(baseSystem, rawPatch = {}) {
+  const base = normalizeGeneratedSystem(baseSystem || {});
+  const patchMap = mapPatchArchetypesByCode(rawPatch.archetypes);
+
+  return {
+    ...base,
+    title: rawPatch.title || base.title,
+    intro: rawPatch.intro || base.intro,
+    logicTitle: rawPatch.logicTitle || base.logicTitle,
+    logicIntro: rawPatch.logicIntro || base.logicIntro,
+    resultNoun: rawPatch.resultNoun || base.resultNoun,
+    playfulLine: rawPatch.playfulLine || base.playfulLine,
+    storyTitle: rawPatch.storyTitle || base.storyTitle,
+    matchTitle: rawPatch.matchTitle || base.matchTitle,
+    archetypes: base.archetypes.map((type, index) => {
+      const patch = patchMap.get(type.code) || patchMap.get(`index-${index}`) || {};
+      return {
+        ...type,
+        name: patch.name || type.name,
+        tagline: patch.tagline || type.tagline,
+        lens: patch.lens || type.lens,
+        advice: patch.advice || type.advice,
+        risk: patch.risk || type.risk
+      };
+    })
+  };
+}
+
+function mergeExamplesPatch(baseSystem, rawPatch = {}) {
+  const base = normalizeGeneratedSystem(baseSystem || {});
+  const patchMap = mapPatchArchetypesByCode(rawPatch.archetypes);
+
+  return {
+    ...base,
+    playfulLine: rawPatch.playfulLine || base.playfulLine,
+    storyTitle: rawPatch.storyTitle || base.storyTitle,
+    matchTitle: rawPatch.matchTitle || base.matchTitle,
+    archetypes: base.archetypes.map((type, index) => {
+      const patch = patchMap.get(type.code) || patchMap.get(`index-${index}`) || {};
+      return {
+        ...type,
+        examples: Array.isArray(patch.examples) && patch.examples.length
+          ? patch.examples.slice(0, 3)
+          : type.examples || []
+      };
+    })
+  };
+}
+
 async function requestMoonshotChat({ model, systemPrompt, userPrompt, jsonMode = true }) {
   const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -683,7 +1224,8 @@ async function requestMoonshotChat({ model, systemPrompt, userPrompt, jsonMode =
   return extractChatCompletionText(responseJson);
 }
 
-async function requestOpenAIResponses({ model, systemPrompt, userPrompt }) {
+async function requestOpenAIResponses({ model, mode = "full", systemPrompt, userPrompt, reasoningEffort = "low" }) {
+  const schema = getSchemaForMode(mode);
   const response = await fetch(`${OPENAI_BASE_URL}/v1/responses`, {
     method: "POST",
     headers: {
@@ -692,7 +1234,7 @@ async function requestOpenAIResponses({ model, systemPrompt, userPrompt }) {
     },
     body: JSON.stringify({
       model,
-      reasoning: { effort: "medium" },
+      reasoning: { effort: reasoningEffort },
       input: [
         {
           role: "system",
@@ -718,7 +1260,7 @@ async function requestOpenAIResponses({ model, systemPrompt, userPrompt }) {
           type: "json_schema",
           name: "shareable_personality_test_system",
           strict: true,
-          schema: outputSchema
+          schema
         }
       }
     })
@@ -736,6 +1278,7 @@ async function requestModel({ mode, systemPrompt, userPrompt }) {
   const primaryModel = getModelForMode(mode);
   const fallbackModel = getFallbackModel(mode);
   const requestFn = isMoonshotBaseUrl() ? requestMoonshotChat : requestOpenAIResponses;
+  const reasoningEffort = "low";
 
   const tryModels = fallbackModel && fallbackModel !== primaryModel
     ? [primaryModel, fallbackModel]
@@ -745,13 +1288,20 @@ async function requestModel({ mode, systemPrompt, userPrompt }) {
 
   for (const model of tryModels) {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const attemptStartedAt = Date.now();
       try {
-        return await requestFn({ model, systemPrompt, userPrompt });
+        const output = await requestFn({ model, mode, systemPrompt, userPrompt, reasoningEffort });
+        console.log(
+          `[personality-generator] model-ready mode=${mode} model=${model} attempt=${attempt} duration_ms=${Date.now() - attemptStartedAt}`
+        );
+        return output;
       } catch (error) {
         lastError = error;
         const message = error?.message || "AI generation request failed.";
         const canRetry = isRetryableProviderError(message) && attempt < 3;
-        console.warn(`[personality-generator] request failed model=${model} attempt=${attempt} mode=${mode}: ${message}`);
+        console.warn(
+          `[personality-generator] request failed model=${model} attempt=${attempt} mode=${mode} duration_ms=${Date.now() - attemptStartedAt}: ${message}`
+        );
         if (canRetry) {
           await sleep(700 * attempt);
           continue;
@@ -792,10 +1342,27 @@ export async function generatePersonalitySystem(input, options = {}) {
   console.log(
     `[personality-generator] start mode=${mode} school=${input.schoolId || "unknown"} direction=${Array.isArray(input.directionIds) ? input.directionIds[0] || "custom" : input.directionIds || "custom"} typeCount=${input.typeCount || 16} questionCount=${input.questionCount || 20}`
   );
+  const requestStartedAt = Date.now();
   const outputText = await requestModel({ mode, systemPrompt, userPrompt });
-  const normalized = normalizeGeneratedSystem(await parseModelJson(outputText, mode));
+  const requestDuration = Date.now() - requestStartedAt;
+  const parseStartedAt = Date.now();
+  const parsed = await parseModelJson(outputText, mode);
+  const parseDuration = Date.now() - parseStartedAt;
+
+  const normalizeStartedAt = Date.now();
+  let normalized;
+  if (mode === "quick" || mode === "full") {
+    normalized = normalizeGeneratedSystem(parsed);
+  } else if (mode === "copy") {
+    normalized = mergeCopyPatch(input.generatedSystem, parsed);
+  } else if (mode === "examples") {
+    normalized = mergeExamplesPatch(input.generatedSystem, parsed);
+  } else {
+    normalized = normalizeGeneratedSystem(parsed);
+  }
+  const normalizeDuration = Date.now() - normalizeStartedAt;
   console.log(
-    `[personality-generator] success mode=${mode} model=${getModelForMode(mode)} axes=${normalized.axes.length} archetypes=${normalized.archetypes.length} duration_ms=${Date.now() - startedAt}`
+    `[personality-generator] success mode=${mode} model=${getModelForMode(mode)} axes=${normalized.axes.length} archetypes=${normalized.archetypes.length} duration_ms=${Date.now() - startedAt} request_ms=${requestDuration} parse_ms=${parseDuration} normalize_ms=${normalizeDuration}`
   );
   return normalized;
 }
