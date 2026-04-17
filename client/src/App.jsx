@@ -942,6 +942,18 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
     () => (primaryType && generated ? buildTypeCodeLegend(primaryType.code, generated.logicAxes) : []),
     [generated, primaryType]
   );
+  const narrativeCards = useMemo(
+    () => {
+      if (!narrative) return [];
+      return [
+        narrative.lensBody ? { title: narrative.lensTitle, body: narrative.lensBody } : null,
+        narrative.adviceBody ? { title: narrative.adviceTitle, body: narrative.adviceBody } : null,
+        narrative.riskBody ? { title: narrative.riskTitle, body: narrative.riskBody } : null,
+        narrative.matchBody ? { title: narrative.matchTitle, body: narrative.matchBody } : null
+      ].filter(Boolean);
+    },
+    [narrative]
+  );
   const resultPayload = showResult && primaryType && narrative
     ? {
         viewerName: participantName.trim() || "这位测试者",
@@ -1118,27 +1130,16 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
               description="每个缩写都对应你在这套测试里更偏向的一侧，分享时别人也能一眼看懂。"
             />
 
-            <div className="answer-grid top-gap">
-              <div className="result-card">
-                <h3>{narrative.lensTitle}</h3>
-                <p>{narrative.lensBody}</p>
+            {narrativeCards.length ? (
+              <div className="answer-grid top-gap">
+                {narrativeCards.map((item) => (
+                  <div key={item.title} className="result-card">
+                    <h3>{item.title}</h3>
+                    <p>{item.body}</p>
+                  </div>
+                ))}
               </div>
-              <div className="result-card">
-                <h3>{narrative.adviceTitle}</h3>
-                <p>{narrative.adviceBody}</p>
-              </div>
-            </div>
-
-            <div className="answer-grid small-gap">
-              <div className="result-card">
-                <h3>{narrative.riskTitle}</h3>
-                <p>{narrative.riskBody}</p>
-              </div>
-              <div className="result-card">
-                <h3>{narrative.matchTitle}</h3>
-                <p>{narrative.matchBody}</p>
-              </div>
-            </div>
+            ) : null}
 
             <section className="top-gap">
               <div className="section-title">{narrative.storyTitle}</div>
@@ -1164,6 +1165,12 @@ function PublicResultPage({ payload, currentHref, copyState, onCopyLink }) {
   const publicTestName = payload.testName || "人格测试";
   const resultHeadline = viewerName ? `${viewerName} 的「${publicTestName}」结果` : payload.headline;
   const publicCodeLegend = buildTypeCodeLegend(payload.type.code, payload.logicAxes || []);
+  const publicNarrativeCards = [
+    payload.lens ? { title: "你给人的感觉", body: payload.lens } : null,
+    payload.advice ? { title: "你更适合的方式", body: payload.advice } : null,
+    payload.risk ? { title: "这类人格的盲点", body: payload.risk } : null,
+    payload.matchBody ? { title: payload.matchTitle || "更直白一点说", body: payload.matchBody } : null
+  ].filter(Boolean);
 
   useEffect(() => {
     document.title = buildDocumentTitle(viewerName ? `${viewerName} 的「${publicTestName}」结果卡` : `「${publicTestName}」结果卡`);
@@ -1202,27 +1209,16 @@ function PublicResultPage({ payload, currentHref, copyState, onCopyLink }) {
             description="这张结果卡里的每个字母，都对应这套测试的一条判断维度。"
           />
 
-          <div className="answer-grid top-gap">
-            <div className="result-card">
-              <h3>你给人的感觉</h3>
-              <p>{payload.lens}</p>
+          {publicNarrativeCards.length ? (
+            <div className="answer-grid top-gap">
+              {publicNarrativeCards.map((item) => (
+                <div key={item.title} className="result-card">
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                </div>
+              ))}
             </div>
-            <div className="result-card">
-              <h3>你更适合的方式</h3>
-              <p>{payload.advice}</p>
-            </div>
-          </div>
-
-          <div className="answer-grid small-gap">
-            <div className="result-card">
-              <h3>这类人格的盲点</h3>
-              <p>{payload.risk}</p>
-            </div>
-            <div className="result-card">
-              <h3>{payload.matchTitle || "更直白一点说"}</h3>
-              <p>{payload.matchBody || payload.summary}</p>
-            </div>
-          </div>
+          ) : null}
 
           <section className="top-gap">
             <div className="section-title">{payload.storyTitle || "这类人会让你想到谁"}</div>

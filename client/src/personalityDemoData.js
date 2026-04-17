@@ -1762,32 +1762,19 @@ export function buildResultNarrative(generated, result, viewerName = "这位测�
   const secondaryType = result.secondary?.type;
   const examples = pickExamples(direction, type);
   const leadExample = examples[0];
-  const safeTraits = Array.isArray(type.traits) && type.traits.length ? type.traits : ["自己的方式"];
-  const lensPrefix = normalizeNarrativePhrase(theme.lensPrefix, "如果把你放进这个主题场景里");
-  const advicePrefix = normalizeNarrativePhrase(theme.advicePrefix, "你更适合的");
-  const riskPrefix = normalizeNarrativePhrase(theme.riskPrefix, "真正容易拖住你的");
   const lensText = normalizeNarrativePhrase(type.lens);
   const adviceText = normalizeNarrativePhrase(type.advice);
   const riskText = normalizeNarrativePhrase(type.risk);
-  const lensDetail = lensText ? ` ${lensText}` : "";
-  const adviceDetail = adviceText ? ` ${adviceText}` : "";
-  const riskDetail = riskText ? ` ${riskText}` : "";
 
   return {
     heading: `${viewerName} 的${theme.resultNoun}是 ${type.name}`,
     wittySummary: `${workFrame ? workFrame.summaryLead : theme.playfulLine} ${type.tagline}`,
     lensTitle: workFrame?.lensTitle || "如果把你放进一个复杂现场里",
-    lensBody: workFrame
-      ? `${workFrame.lensLead({ ...type, traits: safeTraits })}${lensDetail}`
-      : `${lensPrefix}，你更像那种会把“${safeTraits.join("、")}”揉进日常动作里的人。${lensDetail}`.trim(),
+    lensBody: lensText,
     adviceTitle: workFrame?.adviceTitle || "你舒服的时候怎么发力",
-    adviceBody: workFrame
-      ? `${workFrame.adviceLead({ ...type, traits: safeTraits })}${adviceDetail}`
-      : `${advicePrefix}，而是待在一个能放大你优势的位置里。${adviceDetail}`.trim(),
+    adviceBody: adviceText,
     riskTitle: workFrame?.riskTitle || "你容易在哪种时刻被拖累",
-    riskBody: workFrame
-      ? `${workFrame.riskLead({ ...type, traits: safeTraits })}${riskDetail}`
-      : `${riskPrefix}，而是太容易替场面、关系或者意义多扛一层。${riskDetail}`.trim(),
+    riskBody: riskText,
     matchTitle: workFrame?.matchTitle || theme.matchTitle || "更直白一点说",
     matchBody: workFrame
       ? workFrame.matchBody(leadExample, type)

@@ -1016,9 +1016,9 @@ function synthesizeArchetype({ signatureKey, axes, index, title, resultNoun }) {
     name: fallbackName,
     tagline: `${fallbackName}这一型，通常会把 ${pickedLabels.join(" / ")} 这组倾向同时带在身上。`,
     traits,
-    lens: `${title || "这套测试"}里，你往往会自然长成“${fallbackName}”这种存在感：判断有自己的重心，动作也有自己的节奏。`,
-    advice: `先稳住你最拿手的 ${pickedLabels[0]}，再有意识地给 ${pickedLabels[pickedLabels.length - 1]} 留一点弹性，会比一味把优势推满更耐用。`,
-    risk: `当压力上来时，你可能会把 ${pickedLabels.join("、")} 这几面一起踩到底，最后看起来很能扛，但也最容易把自己推到过载。`,
+    lens: "",
+    advice: "",
+    risk: "",
     examples: [],
     signature: Object.fromEntries(
       axes.map((axis, axisIndex) => [axis.id, signatureSides[axisIndex] === "right" ? "right" : "left"])
@@ -1067,9 +1067,9 @@ function normalizeGeneratedSystem(raw) {
       name: nextName,
       tagline: type.tagline || `${nextName}这型人，通常会把 ${pickedLabels.join(" / ")} 这组特征同时拉到台前。`,
       traits: Array.isArray(type.traits) ? type.traits.slice(0, 3) : [],
-      lens: type.lens || `${nextName}往往不是最平均的那种人，而是会在 ${pickedLabels.join("、")} 这些侧面上显得特别有辨识度。`,
-      advice: type.advice || `先把你最稳定的 ${pickedLabels[0]} 用成优势，再补一点 ${pickedLabels[pickedLabels.length - 1]} 的回旋空间，会让你更舒服。`,
-      risk: type.risk || `如果一直硬顶，你可能会把 ${pickedLabels.join("、")} 这几种倾向一起开太满，最后变成自己最先累。`,
+      lens: typeof type.lens === "string" ? type.lens.trim() : "",
+      advice: typeof type.advice === "string" ? type.advice.trim() : "",
+      risk: typeof type.risk === "string" ? type.risk.trim() : "",
       examples: Array.isArray(type.examples) ? type.examples.slice(0, 3) : [],
       signature: Object.fromEntries(
         axes.map((axis, axisIndex) => [axis.id, signatureSides[axisIndex] === "right" ? "right" : "left"])
