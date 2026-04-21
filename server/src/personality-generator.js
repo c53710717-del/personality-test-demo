@@ -1031,9 +1031,17 @@ function normalizeGeneratedSystem(raw) {
   const expectedTypeCount = resolveExpectedTypeCount(raw, expectedAxisCount);
 
   const axes = Array.from({ length: expectedAxisCount }, (_, index) => normalizeAxis(raw.axes?.[index], index));
+  const questionEntries = Array.isArray(raw.questionsByAxis)
+    ? raw.questionsByAxis
+    : raw.questionsByAxis && typeof raw.questionsByAxis === "object"
+      ? Object.entries(raw.questionsByAxis).map(([axisId, item]) => ({
+          axisId,
+          ...(item && typeof item === "object" ? item : {})
+        }))
+      : [];
 
   const questionMap = new Map(
-    (raw.questionsByAxis || []).map((item, index) => [
+    questionEntries.map((item, index) => [
       item.axisId || axes[index]?.id,
       {
         left: Array.isArray(item.left) ? item.left.slice(0, 3) : [],
