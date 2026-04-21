@@ -14,7 +14,25 @@ import {
 } from "./personalityDemoData.js";
 import { fetchGeneratedPersonalityTest, generatePersonalityTest } from "./api.js";
 
-const SITE_TITLE = "可分享人格测试";
+const SITE_TITLE = "persona.cards";
+const GLYPH_KINDS = ["compass", "lantern", "signal"];
+const ROOM_STEPS = [
+  { id: "foundation", label: "铺主题地基", detail: "先把流派、方向和语境立起来。" },
+  { id: "walls", label: "立分型墙面", detail: "把核心维度和类型骨架搭好。" },
+  { id: "desk", label: "摆题目桌面", detail: "让每一道题都能落在可回答的情境里。" },
+  { id: "rack", label: "挂人格卡架", detail: "每一种类型都有自己的名字和入口。" },
+  { id: "light", label: "点亮结果灯", detail: "把可分享的结果页和预览页一起接上。" }
+];
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function hashString(value) {
+  return Array.from(String(value || "")).reduce((sum, character, index) => (
+    (sum * 31 + character.charCodeAt(0) + index) % 2147483647
+  ), 7);
+}
 
 function getBaseUrl() {
   return `${window.location.origin}${window.location.pathname}`;
@@ -74,173 +92,110 @@ function navigateTo(url, replace = false) {
   }
 }
 
-function OptionCard({ active, title, description, onClick }) {
-  return (
-    <button type="button" className={`option-card${active ? " active" : ""}`} onClick={onClick}>
-      <strong>{title}</strong>
-      <span>{description}</span>
-    </button>
-  );
+function normalizeCompactTokens(typeCode) {
+  if (Array.isArray(typeCode)) {
+    return typeCode.map((token) => String(token).trim()).filter(Boolean);
+  }
+
+  return String(typeCode || "")
+    .split(/[\s\-_/|·]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
 }
 
-function DirectionChip({ active, label, onClick }) {
-  return (
-    <button type="button" className={`chip${active ? " active" : ""}`} onClick={onClick}>
-      {label}
-    </button>
-  );
-}
+function splitTypeCodeTokens(typeCode, logicAxes = []) {
+  const separatedTokens = normalizeCompactTokens(typeCode);
+  if (!logicAxes.length) {
+    if (separatedTokens.length > 1) return separatedTokens;
+    return String(typeCode || "")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .split("")
+      .filter(Boolean);
+  }
 
-function AnswerQuestionCard({ question, index, value, onAnswer }) {
-  return (
-    <article className="question-card">
-      <div className="question-head">
-        <div className="question-index">{index + 1}</div>
-        <div className="question-title">
-          <strong>{question.label}</strong>
-        </div>
-      </div>
-      <div className="likert">
-        {scaleLabels.map((scale) => (
-          <button
-            key={scale.value}
-            type="button"
-            className={`scale${value === scale.value ? " active" : ""}`}
-            onClick={() => onAnswer(question.id, scale.value)}
-          >
-            <strong>{scale.short}</strong>
-            <span>{scale.text}</span>
-          </button>
-        ))}
-      </div>
-    </article>
-  );
+  if (separatedTokens.length === logicAxes.length) return separatedTokens;
+
+  const compactCode = Array.isArray(typeCode)
+    ? typeCode.join("")
+    : String(typeCode || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  if (!compactCode) return [];
+
+  const compactTokens = [];
+  let cursor = 0;
+
+  for (const axis of logicAxes) {
+    const options = [axis.leftCode, axis.rightCode]
+      .filter(Boolean)
+      .map((token) => String(token).toUpperCase())
+      .sort((left, right) => right.length - left.length);
+    const matched = options.find((option) => compactCode.slice(cursor).startsWith(option));
+    if (!matched) return [];
+    compactTokens.push(matched);
+    cursor += matched.length;
+  }
+
+  return cursor === compactCode.length ? compactTokens : [];
 }
 
 function buildTypeCodeLegend(typeCode, logicAxes = []) {
   if (!typeCode || !logicAxes.length) return [];
-
-  const separatedTokens = typeCode
-    .split(/[\s\-_/|·]+/)
-    .map((token) => token.trim())
-    .filter(Boolean);
-  const tokens = separatedTokens.length === logicAxes.length
-    ? separatedTokens
-    : (() => {
-        const compactCode = typeCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-        if (!compactCode) return [];
-
-        const compactTokens = [];
-        let cursor = 0;
-
-        for (const axis of logicAxes) {
-          const options = [axis.leftCode, axis.rightCode]
-            .filter(Boolean)
-            .map((token) => String(token).toUpperCase())
-            .sort((a, b) => b.length - a.length);
-          const matched = options.find((option) => compactCode.slice(cursor).startsWith(option));
-          if (!matched) return [];
-          compactTokens.push(matched);
-          cursor += matched.length;
-        }
-
-        return cursor === compactCode.length ? compactTokens : [];
-      })();
-
+  const tokens = splitTypeCodeTokens(typeCode, logicAxes);
   if (tokens.length !== logicAxes.length) return [];
 
-  return logicAxes
-    .map((axis, index) => {
-      const token = tokens[index];
-      const normalizedToken = String(token).toUpperCase();
-      if (!token) return null;
+  return logicAxes.map((axis, index) => {
+    const token = String(tokens[index] || "").toUpperCase();
 
-      if (normalizedToken === String(axis.leftCode || "").toUpperCase()) {
-        return { code: axis.leftCode, label: axis.left, description: axis.leftDescription };
-      }
+    if (token === String(axis.leftCode || "").toUpperCase()) {
+      return {
+        code: axis.leftCode,
+        label: axis.left,
+        description: axis.leftDescription,
+        side: "left"
+      };
+    }
 
-      if (normalizedToken === String(axis.rightCode || "").toUpperCase()) {
-        return { code: axis.rightCode, label: axis.right, description: axis.rightDescription };
-      }
+    if (token === String(axis.rightCode || "").toUpperCase()) {
+      return {
+        code: axis.rightCode,
+        label: axis.right,
+        description: axis.rightDescription,
+        side: "right"
+      };
+    }
 
-      return null;
-    })
-    .filter(Boolean);
+    return null;
+  }).filter(Boolean);
 }
 
-function AxisCodeGuide({ logicAxes = [], title = "字母缩写说明", description = "结果字母不是黑话，每一位都对应一条清晰维度。" }) {
-  const rows = logicAxes.filter((axis) => axis.leftCode || axis.rightCode);
-  if (!rows.length) return null;
+function buildCardStats(typeCode, logicAxes = []) {
+  const legend = buildTypeCodeLegend(typeCode, logicAxes);
+  const tokens = legend.length
+    ? legend.map((item) => item.code)
+    : splitTypeCodeTokens(typeCode, logicAxes);
 
-  return (
-    <section className="code-guide-card">
-      <div className="code-guide-head">
-        <strong>{title}</strong>
-        <p>{description}</p>
-      </div>
-      <div className="code-guide-grid">
-        {rows.map((axis) => (
-          <article key={axis.id} className="code-guide-axis">
-            <span>{axis.label}</span>
-            <div className="code-guide-pairs">
-              <div>
-                <strong>{axis.leftCode}</strong>
-                <b>{axis.left}</b>
-                <p>{axis.leftDescription}</p>
-              </div>
-              <div>
-                <strong>{axis.rightCode}</strong>
-                <b>{axis.right}</b>
-                <p>{axis.rightDescription}</p>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
+  return tokens.slice(0, 5).map((token, index) => ({
+    label: token,
+    value: 54 + ((hashString(`${token}-${index}-${typeCode}`) + index * 11) % 34)
+  }));
 }
 
-function ShareBanner({ name, tagline, code = "", codeLegend = [] }) {
-  return (
-    <div className="share-poster">
-      <div>
-        {code ? <span className="type-code">{code}</span> : null}
-        <h3>{name}</h3>
-        <p>{tagline}</p>
-        {codeLegend.length ? (
-          <div className="result-code-legend">
-            {codeLegend.map((item) => (
-              <span key={`${item.code}-${item.label}`}>
-                <strong>{item.code}</strong>
-                {item.label}
-              </span>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
+function buildRarity(seed) {
+  const score = hashString(seed) % 10;
+  if (score < 2) return "RARE";
+  if (score < 5) return "UNCOMMON";
+  return "COMMON";
 }
 
-function StoryCard({ item }) {
-  return (
-    <article className="story-card">
-      <strong>{item.name}</strong>
-      <p>{item.why}</p>
-      <span>{item.story}</span>
-    </article>
-  );
+function getGlyphKind(seed) {
+  return GLYPH_KINDS[hashString(seed) % GLYPH_KINDS.length];
 }
-
-const generationMilestones = ["写出测试标题", "长出第一道题", "生成结果卡"];
 
 function getExpectedPreviewTimeMs(configLike) {
   const typeCount = Number(configLike?.typeCount) || 16;
   const questionCount = Number(configLike?.questionCount) || 20;
-  const typeWeight = { 4: 12000, 8: 22000, 16: 45000, 32: 70000 };
-  const questionOffset = Math.max(0, questionCount - 12) * 500;
-  return (typeWeight[typeCount] || 45000) + questionOffset;
+  const typeWeight = { 4: 14000, 8: 22000, 16: 42000, 32: 70000 };
+  const questionOffset = Math.max(0, questionCount - 12) * 600;
+  return (typeWeight[typeCount] || 42000) + questionOffset;
 }
 
 function getExpectedCompletionTimeMs(configLike) {
@@ -261,59 +216,41 @@ function formatWaitLabel(elapsedMs) {
 
 function formatExpectedLabel(expectedMs) {
   const totalSeconds = Math.round(expectedMs / 1000);
-  if (totalSeconds < 60) return `通常约 ${totalSeconds} 秒`;
+  if (totalSeconds < 60) return `约 ${totalSeconds} 秒`;
   const minutes = Math.round(totalSeconds / 60);
-  return `通常约 ${minutes} 分钟`;
+  return `约 ${minutes} 分钟`;
 }
 
 function getDraftingSummaryLabel(stage) {
-  if (stage === "examples") return "示例内容补齐中";
-  if (stage === "retrying") return "正在重新补齐";
+  if (stage === "examples") return "案例内容补齐中";
+  if (stage === "retrying") return "结果卡正在重试补齐";
   return "结果文案补齐中";
 }
 
 function getDraftingNote(stage, configLike) {
   if (stage === "examples") {
     return {
-      title: "你现在已经可以先预览、先分享。",
-      body: `测试题和结果主文案已经可用；人物示例和分享表达还在继续补齐，${formatExpectedLabel(getExpectedCompletionTimeMs(configLike) * 0.35)}。`
+      title: "可预览版已经出来了。",
+      body: `测试题和结果主文案已经可用，人物案例还在继续补齐，完整版${formatExpectedLabel(getExpectedCompletionTimeMs(configLike) * 0.35)}。`
     };
   }
 
   return {
-    title: "可预览版已经生成好了。",
-    body: `你现在就能预览、先分享；结果页文案还会继续补齐，完整版${formatExpectedLabel(getExpectedCompletionTimeMs(configLike))}。`
+    title: "测试现在就能预览和分享。",
+    body: `结果页的细化文案仍在后台补齐，完整版${formatExpectedLabel(getExpectedCompletionTimeMs(configLike))}。`
   };
 }
 
 function getGeneratedSubcopy(status, stage, configLike) {
-  if (status !== "drafting") {
-    return "现在就能把它发出去，也可以先直接看看这套测试生成出来的结果框架。";
+  if (status !== "drafting" && status !== "retrying") {
+    return "现在就能把这套测试发出去，也能先检查所有人格卡、题目和结果框架。";
   }
 
   if (stage === "examples") {
-    return `现在就能把它发出去。测试题和结果主文案已经可用；人物示例和分享表达还在继续补齐，完整版${formatExpectedLabel(getExpectedCompletionTimeMs(configLike) * 0.35)}。`;
+    return `先发先用没问题，案例和分享表达还在继续补齐，完整版${formatExpectedLabel(getExpectedCompletionTimeMs(configLike) * 0.35)}。`;
   }
 
-  return `现在就能把它发出去。测试题和人格结果已经可用；结果页文案还在后台继续补齐，完整版${formatExpectedLabel(getExpectedCompletionTimeMs(configLike))}。`;
-}
-
-function getProgressPercent(elapsedMs, expectedMs) {
-  const normalized = Math.max(0, elapsedMs) / Math.max(expectedMs, 1);
-
-  if (normalized < 0.25) {
-    return 8 + normalized * 80;
-  }
-
-  if (normalized < 0.75) {
-    return 28 + ((normalized - 0.25) / 0.5) * 32;
-  }
-
-  if (normalized < 1.15) {
-    return 60 + ((normalized - 0.75) / 0.4) * 16;
-  }
-
-  return 76 + Math.min(8, ((normalized - 1.15) / 0.8) * 8);
+  return `测试和结果骨架已经可用，后台仍在补完整结果卡文案，完整版${formatExpectedLabel(getExpectedCompletionTimeMs(configLike))}。`;
 }
 
 function buildGenerationPreviewContent(configLike) {
@@ -321,7 +258,7 @@ function buildGenerationPreviewContent(configLike) {
 
   if (directionLabel.includes("职场")) {
     return {
-      question: "“当协作里出现分歧时，你更像先稳住场面，还是先拉回目标？”",
+      question: "当协作里出现分歧时，你更像先稳住场面，还是先拉回目标？",
       resultName: "稳场协作者",
       resultDescription: "既能接住现场气氛，也能把讨论慢慢带回真正要解决的问题。"
     };
@@ -329,7 +266,7 @@ function buildGenerationPreviewContent(configLike) {
 
   if (directionLabel.includes("关系")) {
     return {
-      question: "“关系里出现误会时，你更像先安抚情绪，还是先把话说清楚？”",
+      question: "关系里出现误会时，你更像先安抚情绪，还是先把话说清楚？",
       resultName: "关系点灯人",
       resultDescription: "很会找到对话里的转折点，让尴尬的场面重新亮起来。"
     };
@@ -337,81 +274,418 @@ function buildGenerationPreviewContent(configLike) {
 
   if (directionLabel.includes("情绪")) {
     return {
-      question: "“情绪上头的时候，你更像先把感受说出来，还是先把自己稳住？”",
+      question: "情绪上头的时候，你更像先把感受说出来，还是先把自己稳住？",
       resultName: "情绪翻译者",
-      resultDescription: "能把模糊的心情说清楚，也能帮别人看见自己真正卡住的地方。"
+      resultDescription: "能把模糊的心情说清楚，也能帮别人看见真正卡住的地方。"
     };
   }
 
   return {
-    question: `“在${directionLabel || "这个主题"}里，别人最容易因你身上的哪种反应记住你？”`,
+    question: `在${directionLabel || "这个主题"}里，别人最容易因你身上的哪种反应记住你？`,
     resultName: "共情控场者",
     resultDescription: "很会接人、稳住场面，也让别人愿意继续把话说下去。"
   };
 }
 
-function GenerationPreviewMock({ testName, configLike, revealLevel }) {
+function buildBuilderPreview(configLike) {
+  const school = schools.find((item) => item.id === configLike?.schoolId) || schools[0];
+  const preview = buildGenerationPreviewContent(configLike);
+  const typeCount = Number(configLike?.typeCount) || 16;
+  const code = typeCount >= 32 ? "EACSV" : typeCount >= 16 ? "EACS" : typeCount >= 8 ? "EAC" : "EA";
+
+  return {
+    code,
+    name: preview.resultName,
+    tagline: preview.resultDescription,
+    question: preview.question,
+    school: school.short,
+    footerLeft: `${resolveDirectionLabel(configLike)}人格测试`,
+    footerRight: `${typeCount} 张 · ${Number(configLike?.questionCount) || 20} 题`,
+    rarity: "RARE"
+  };
+}
+
+function buildLoadingLogs(configLike) {
+  const school = schools.find((item) => item.id === configLike?.schoolId) || schools[0];
+  const direction = resolveDirectionLabel(configLike).replace(/人格测试$/, "");
   const typeCount = Number(configLike?.typeCount) || 16;
   const questionCount = Number(configLike?.questionCount) || 20;
-  const previewContent = buildGenerationPreviewContent(configLike);
-  const showTitle = revealLevel >= 1;
-  const showQuestion = revealLevel >= 2;
-  const showResult = revealLevel >= 3;
 
+  return [
+    `[00:01] init schema=${school.short} theme=${direction || "通用"} types=${typeCount} q=${questionCount}`,
+    `[00:04] axes generated ............ OK (${Math.min(5, Math.max(2, Math.log2(typeCount)))})`,
+    `[00:09] minting card #01 ......... "${buildGenerationPreviewContent(configLike).resultName}"`,
+    `[00:14] drafting questions ....... ${Math.min(questionCount, Math.max(4, Math.round(questionCount * 0.55)))}/${questionCount}`,
+    `[00:19] writing result copy ...... ready for preview`,
+    `[00:24] sync share + preview ...... linked`
+  ];
+}
+
+function buildAxisBreakdown(generated, result, primaryType = null) {
+  return generated.axes.map((axis) => {
+    const leftCode = axis.left.code || "";
+    const leftLabel = axis.left.label || axis.left.name || "左侧";
+    const leftDescription = axis.left.description || axis.left.summary || "";
+    const rightCode = axis.right.code || "";
+    const rightLabel = axis.right.label || axis.right.name || "右侧";
+    const rightDescription = axis.right.description || axis.right.summary || "";
+    const questionCount = generated.questions.filter((question) => question.axisId === axis.id).length;
+    const maxScore = Math.max(1, questionCount * 2);
+    const rawScore = result.axisScores[axis.id] || 0;
+    const preferredSide = primaryType?.signature?.[axis.id] || "right";
+    const resolvedSide = Math.abs(rawScore) < 0.05 ? preferredSide : rawScore >= 0 ? "right" : "left";
+    const selectedCode = resolvedSide === "right" ? rightCode : leftCode;
+    const selectedLabel = resolvedSide === "right" ? rightLabel : leftLabel;
+    const selectedDescription = resolvedSide === "right" ? rightDescription : leftDescription;
+    const position = clamp(50 + (rawScore / maxScore) * 50, 8, 92);
+
+    return {
+      id: axis.id,
+      label: axis.label,
+      leftCode,
+      left: leftLabel,
+      leftDescription,
+      rightCode,
+      right: rightLabel,
+      rightDescription,
+      selectedCode,
+      selectedLabel,
+      selectedDescription,
+      position
+    };
+  });
+}
+
+function buildAxisBreakdownFromPayload(typeCode, logicAxes = []) {
+  const legend = buildTypeCodeLegend(typeCode, logicAxes);
+
+  return logicAxes.map((axis, index) => {
+    const current = legend[index];
+    const resolvedSide = current?.side || "left";
+    const selectedCode = current?.code || (resolvedSide === "right" ? axis.rightCode : axis.leftCode);
+    const selectedLabel = current?.label || (resolvedSide === "right" ? axis.right : axis.left);
+    const selectedDescription = current?.description || (resolvedSide === "right" ? axis.rightDescription : axis.leftDescription);
+
+    return {
+      id: axis.id || `axis-${index}`,
+      label: axis.label,
+      leftCode: axis.leftCode,
+      left: axis.left,
+      leftDescription: axis.leftDescription,
+      rightCode: axis.rightCode,
+      right: axis.right,
+      rightDescription: axis.rightDescription,
+      selectedCode,
+      selectedLabel,
+      selectedDescription,
+      position: resolvedSide === "right" ? 70 : 30
+    };
+  });
+}
+
+function AppMark({ subtle = false }) {
   return (
-    <aside className="generation-preview-shell" aria-label="生成预览">
-      <div className="generation-preview-window">
-        <div className="generation-preview-toolbar">
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="generation-preview-topline">
-          <b className={showTitle ? "generation-reveal is-visible" : "generation-reveal"}>
-            {showTitle ? testName : " "}
-          </b>
-          <em>{typeCount} 型</em>
-        </div>
-        <div className="generation-preview-canvas">
-          <section className={`generation-preview-question${showQuestion ? "" : " is-pending"}`}>
-            <span className="generation-preview-tag">Question</span>
-            <strong className={showQuestion ? "generation-reveal is-visible" : "generation-reveal"}>
-              {showQuestion ? previewContent.question : " "}
-            </strong>
-            <div className="generation-preview-scale">
-              {["1", "2", "3", "4", "5"].map((item) => (
-                <i key={item}>{item}</i>
-              ))}
-            </div>
-          </section>
-
-          <section className={`generation-preview-result${showResult ? "" : " is-pending"}`}>
-            <span className="generation-preview-tag neutral">Result</span>
-            <strong className={showResult ? "generation-reveal is-visible" : "generation-reveal"}>
-              {showResult ? previewContent.resultName : " "}
-            </strong>
-            <p className={showResult ? "generation-reveal is-visible" : "generation-reveal"}>
-              {showResult ? previewContent.resultDescription : " "}
-            </p>
-            <div className="generation-preview-code">
-              <span>E</span>
-              <span>A</span>
-              <span>C</span>
-              <span>S</span>
-            </div>
-          </section>
-        </div>
-        <div className="generation-preview-footer">
-          <span>{questionCount} 题</span>
-          <span>生成中</span>
-        </div>
+    <div className="app-mark">
+      <span className={`app-mark-orb${subtle ? " subtle" : ""}`} />
+      <div className="app-mark-copy">
+        <strong>persona.cards</strong>
+        {!subtle ? <span>会被转发的人格卡</span> : null}
       </div>
-    </aside>
+    </div>
   );
 }
 
-function GenerationProgressCard({ testName, configLike }) {
+function Pill({ tone = "paper", children }) {
+  return <span className={`pill pill-${tone}`}>{children}</span>;
+}
+
+function ActionButton({ kind = "primary", className = "", ...props }) {
+  return <button type="button" className={`action-button action-${kind} ${className}`.trim()} {...props} />;
+}
+
+function CreatorTopbar({ stage, onGoHome }) {
+  const steps = [
+    { id: "builder", label: "选择内容" },
+    { id: "generating", label: "生成" },
+    { id: "preview", label: "预览与分享" }
+  ];
+  const currentIndex = Math.max(0, steps.findIndex((step) => step.id === stage));
+
+  return (
+    <header className="topbar topbar-creator">
+      <button type="button" className="brand-button" onClick={onGoHome}>
+        <AppMark subtle />
+      </button>
+      <div className="stepper">
+        {steps.map((step, index) => {
+          const status = index < currentIndex ? "done" : index === currentIndex ? "active" : "pending";
+          return (
+            <div key={step.id} className={`stepper-item ${status}`}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <strong>{step.label}</strong>
+            </div>
+          );
+        })}
+      </div>
+      <Pill tone="ink">在线运行</Pill>
+    </header>
+  );
+}
+
+function TakerTopbar({ stage, progress = 0, onGoHome }) {
+  const stageLabel = stage === "result" ? "你的结果" : stage === "share" ? "分享结果" : "答题中";
+
+  return (
+    <header className="topbar topbar-taker">
+      <button type="button" className="brand-button" onClick={onGoHome}>
+        <AppMark subtle />
+      </button>
+      <div className="taker-progress">
+        <div className="taker-progress-meta">
+          <span>{stageLabel}</span>
+          <b>{Math.round(progress)}%</b>
+        </div>
+        <div className="taker-progress-rail">
+          <i style={{ width: `${clamp(progress, 0, 100)}%` }} />
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function PersonaGlyph({ kind = "compass" }) {
+  if (kind === "lantern") {
+    return (
+      <svg viewBox="0 0 100 100" className="persona-glyph" aria-hidden="true">
+        <circle cx="50" cy="50" r="31" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <circle cx="50" cy="50" r="21" fill="var(--accent-soft)" />
+        <circle cx="50" cy="50" r="13" fill="var(--accent-strong)" />
+        <path d="M 50 10 L 50 22 M 50 78 L 50 90 M 10 50 L 22 50 M 78 50 L 90 50" stroke="currentColor" strokeWidth="1.6" />
+      </svg>
+    );
+  }
+
+  if (kind === "signal") {
+    return (
+      <svg viewBox="0 0 100 100" className="persona-glyph" aria-hidden="true">
+        <rect x="28" y="56" width="8" height="24" fill="currentColor" />
+        <rect x="41" y="42" width="8" height="38" fill="currentColor" />
+        <rect x="54" y="26" width="8" height="54" fill="var(--accent-strong)" />
+        <rect x="67" y="14" width="8" height="66" fill="currentColor" />
+        <circle cx="18" cy="22" r="4" fill="var(--accent-strong)" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 100 100" className="persona-glyph" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" strokeWidth="1.2" strokeDasharray="3 3" />
+      <circle cx="50" cy="50" r="29" fill="currentColor" />
+      <circle cx="50" cy="50" r="21" fill="none" stroke="var(--accent-strong)" strokeWidth="2" />
+      <circle cx="50" cy="50" r="6" fill="var(--accent-strong)" />
+      <path d="M 50 9 L 52 18 L 48 18 Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function PersonaCard({
+  code,
+  logicAxes = [],
+  name,
+  tagline,
+  schoolLabel,
+  rarity = "COMMON",
+  footerLeft,
+  footerRight,
+  glyph,
+  rotate = 0,
+  scale = 1,
+  highlightIndex,
+  stats,
+  skeleton = false
+}) {
+  const tokens = splitTypeCodeTokens(code, logicAxes);
+  const cardStats = stats?.length ? stats : buildCardStats(code, logicAxes);
+  const activeIndex = highlightIndex ?? Math.max(0, tokens.length - 1);
+  const style = {
+    transform: `rotate(${rotate}deg) scale(${scale})`
+  };
+
+  return (
+    <div className="persona-card-shell" style={style}>
+      <article className={`persona-card${skeleton ? " skeleton" : ""}`}>
+        <header className="persona-card-head">
+          <span>{schoolLabel || "persona.cards"}</span>
+          <b>{rarity}</b>
+        </header>
+
+        <div className="persona-illustration">
+          <PersonaGlyph kind={glyph} />
+        </div>
+
+        <div className="persona-code-row">
+          {tokens.map((token, index) => (
+            <span key={`${token}-${index}`} className={index === activeIndex ? "active" : ""}>
+              {token}
+            </span>
+          ))}
+        </div>
+
+        {skeleton ? (
+          <div className="persona-skeleton-copy">
+            <i />
+            <i />
+          </div>
+        ) : (
+          <div className="persona-copy">
+            <h3>{name}</h3>
+            <p>{tagline}</p>
+          </div>
+        )}
+
+        <div className="persona-stats">
+          {cardStats.map((item) => (
+            <div key={`${item.label}-${item.value}`}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </div>
+          ))}
+        </div>
+
+        <footer className="persona-card-foot">
+          <span>{footerLeft}</span>
+          <span>{footerRight}</span>
+        </footer>
+      </article>
+    </div>
+  );
+}
+
+function MiniTypeCard({ type, logicAxes, active, onClick, index, total }) {
+  const tokens = splitTypeCodeTokens(type.code, logicAxes);
+
+  return (
+    <button type="button" className={`mini-type-card${active ? " active" : ""}`} onClick={onClick}>
+      <div className="mini-type-meta">
+        <span>{String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}</span>
+        <b>{buildRarity(type.name)}</b>
+      </div>
+      <div className="mini-type-code">
+        {tokens.map((token, tokenIndex) => (
+          <span key={`${token}-${tokenIndex}`}>{token}</span>
+        ))}
+      </div>
+      <strong>{type.name}</strong>
+      <p>{type.tagline}</p>
+    </button>
+  );
+}
+
+function AxisCodeGuide({ logicAxes = [], title, description }) {
+  if (!logicAxes.length) return null;
+
+  return (
+    <section className="guide-card">
+      <div className="section-head">
+        <div>
+          <span className="micro-label">{title}</span>
+          <h3>每一个字母都对应一条清晰维度</h3>
+        </div>
+        <p>{description}</p>
+      </div>
+
+      <div className="axis-guide-grid">
+        {logicAxes.map((axis) => (
+          <article key={axis.id} className="axis-guide-card">
+            <strong>{axis.label}</strong>
+            <div className="axis-guide-row">
+              <div>
+                <span>{axis.leftCode}</span>
+                <b>{axis.left}</b>
+                <p>{axis.leftDescription}</p>
+              </div>
+              <div>
+                <span>{axis.rightCode}</span>
+                <b>{axis.right}</b>
+                <p>{axis.rightDescription}</p>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AxisSpectrumCard({ axis }) {
+  return (
+    <article className="axis-spectrum-card">
+      <div className="axis-spectrum-head">
+        <div>
+          <span>{axis.label}</span>
+          <strong>{axis.selectedLabel}</strong>
+        </div>
+        {axis.selectedCode ? <b>{axis.selectedCode}</b> : null}
+      </div>
+      <p>{axis.selectedDescription}</p>
+      <div className="axis-spectrum-track">
+        <i style={{ left: `${axis.position}%` }} />
+      </div>
+      <div className="axis-spectrum-meta">
+        <span>{axis.leftCode} · {axis.left}</span>
+        <span>{axis.rightCode} · {axis.right}</span>
+      </div>
+    </article>
+  );
+}
+
+function NarrativeCard({ index, title, body }) {
+  return (
+    <article className="narrative-card">
+      <div className="narrative-card-head">
+        <span>{String(index + 1).padStart(2, "0")}</span>
+        <strong>{title}</strong>
+      </div>
+      <p>{body}</p>
+    </article>
+  );
+}
+
+function StoryCard({ item }) {
+  return (
+    <article className="story-card">
+      <strong>{item.name}</strong>
+      <p>{item.why}</p>
+      <span>{item.story}</span>
+    </article>
+  );
+}
+
+function LoadingRoomScene({ revealCount }) {
+  return (
+    <div className="room-scene">
+      <div className={`room-piece room-floor${revealCount >= 1 ? " ready" : ""}`} />
+      <div className={`room-piece room-wall left${revealCount >= 2 ? " ready" : ""}`} />
+      <div className={`room-piece room-wall right${revealCount >= 2 ? " ready" : ""}`} />
+      <div className={`room-piece room-desk${revealCount >= 3 ? " ready" : ""}`} />
+      <div className={`room-piece room-rack${revealCount >= 4 ? " ready" : ""}`} />
+      <div className={`room-piece room-lamp${revealCount >= 5 ? " ready" : ""}`} />
+      <div className={`room-piece room-card card-a${revealCount >= 4 ? " ready" : ""}`} />
+      <div className={`room-piece room-card card-b${revealCount >= 4 ? " ready" : ""}`} />
+      <div className={`room-piece room-card card-c${revealCount >= 5 ? " ready" : ""}`} />
+    </div>
+  );
+}
+
+function GenerationStudio({ testName, configLike }) {
   const [elapsedMs, setElapsedMs] = useState(0);
+  const previewCard = useMemo(() => buildBuilderPreview(configLike), [configLike]);
+  const cliLogs = useMemo(() => buildLoadingLogs(configLike), [configLike]);
+  const expectedPreviewTimeMs = getExpectedPreviewTimeMs(configLike);
+  const expectedCompletionTimeMs = getExpectedCompletionTimeMs(configLike);
+  const normalized = clamp(elapsedMs / Math.max(expectedPreviewTimeMs, 1), 0, 1.4);
+  const revealCount = clamp(Math.floor(normalized * ROOM_STEPS.length) + 1, 1, ROOM_STEPS.length);
+  const visibleLogCount = clamp(Math.floor(normalized * cliLogs.length) + 1, 1, cliLogs.length);
 
   useEffect(() => {
     const startedAt = Date.now();
@@ -419,108 +693,304 @@ function GenerationProgressCard({ testName, configLike }) {
       setElapsedMs(Date.now() - startedAt);
     }, 400);
 
-    return () => {
-      window.clearInterval(timer);
-    };
+    return () => window.clearInterval(timer);
   }, []);
 
-  const expectedPreviewTimeMs = getExpectedPreviewTimeMs(configLike);
-  const progressWidth = getProgressPercent(elapsedMs, expectedPreviewTimeMs);
-  const revealLevel = progressWidth >= 68 ? 3 : progressWidth >= 42 ? 2 : progressWidth >= 18 ? 1 : 0;
-  const activeMilestoneIndex = revealLevel >= generationMilestones.length ? generationMilestones.length - 1 : revealLevel;
-  const expectedCompletionTimeMs = getExpectedCompletionTimeMs(configLike);
-
   return (
-    <section className="panel generation-progress-card">
-      <div className="generation-progress-hero">
+    <section className="glass-panel studio-panel">
+      <div className="section-head">
         <div>
-          <div className="system-badge">人格测试</div>
-          <h2>正在生成「{testName}」</h2>
-          <p className="sub">
-            先生成可预览版，{formatExpectedLabel(expectedPreviewTimeMs)}；完整版会继续在后台补齐，{formatExpectedLabel(expectedCompletionTimeMs)}。
-          </p>
-          <div className="generation-milestone-row" aria-label="生成进度">
-            {generationMilestones.map((label, index) => {
-              const status = index < revealLevel ? "done" : index === activeMilestoneIndex ? "active" : "pending";
+          <span className="micro-label">拼搭房间 · loading</span>
+          <h2>正在搭出「{testName}」的生成空间</h2>
+        </div>
+      </div>
+
+      <div className="studio-grid">
+        <div className="studio-copy">
+          <div className="status-row">
+            <Pill tone="violet">可预览版 {formatExpectedLabel(expectedPreviewTimeMs)}</Pill>
+            <Pill tone="paper">完整版 {formatExpectedLabel(expectedCompletionTimeMs)}</Pill>
+          </div>
+
+          <div className="studio-step-list">
+            {ROOM_STEPS.map((step, index) => {
+              const status = index + 1 < revealCount ? "done" : index + 1 === revealCount ? "active" : "pending";
               return (
-                <div key={label} className={`generation-milestone ${status}`}>
-                  <span className="generation-milestone-dot" aria-hidden="true" />
-                  <strong>{label}</strong>
-                </div>
+                <article key={step.id} className={`studio-step ${status}`}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <div>
+                    <strong>{step.label}</strong>
+                    <p>{step.detail}</p>
+                  </div>
+                </article>
               );
             })}
           </div>
+
+          <div className="terminal-panel" aria-label="生成日志">
+            <div className="terminal-head">
+              <span>stream · stdout</span>
+              <b>{schoolLabelForTerminal(configLike)}</b>
+            </div>
+            <div className="terminal-body">
+              {cliLogs.slice(0, visibleLogCount).map((line) => (
+                <div key={line} className="terminal-line">{line}</div>
+              ))}
+              <div className="terminal-cursor-line">
+                <span>&gt;</span>
+                <i />
+              </div>
+            </div>
+          </div>
+
+          <div className="studio-meta">
+            <span>{formatWaitLabel(elapsedMs)}</span>
+            <span>已完成 {revealCount} / {ROOM_STEPS.length} 个部件</span>
+          </div>
         </div>
-        <GenerationPreviewMock testName={testName} configLike={configLike} revealLevel={revealLevel} />
-      </div>
-      <div className="progress-rail top-gap">
-        <i style={{ width: `${progressWidth}%` }} />
-      </div>
-      <div className="progress-meta">
-        <span>{formatWaitLabel(elapsedMs)}</span>
-        <span>可预览版{formatExpectedLabel(expectedPreviewTimeMs)}</span>
+
+        <div className="studio-scene">
+          <LoadingRoomScene revealCount={revealCount} />
+          <div className="studio-card-preview">
+            <PersonaCard
+              code={previewCard.code}
+              name={previewCard.name}
+              tagline={previewCard.tagline}
+              schoolLabel={previewCard.school}
+              rarity={previewCard.rarity}
+              footerLeft={previewCard.footerLeft}
+              footerRight={previewCard.footerRight}
+              glyph={getGlyphKind(previewCard.name)}
+              stats={buildCardStats(previewCard.code)}
+              skeleton={revealCount < 4}
+              rotate={-4}
+              scale={0.92}
+            />
+          </div>
+        </div>
       </div>
     </section>
   );
 }
 
-function Shell({ eyebrow, title, description, children, mode = "hero", navMeta = "生成测试 · 完成测试 · 分享结果", hideHead = false }) {
+function GeneratedHub({
+  generated,
+  generatedTestName,
+  generationStatus,
+  generationStage,
+  retryCount,
+  copyLabel,
+  onCopyLink,
+  onOpenTest,
+  onRetry,
+  isRetrying
+}) {
+  const [tab, setTab] = useState("cards");
+  const [selectedTypeId, setSelectedTypeId] = useState(generated.types[0]?.id || "");
+  const selectedType = generated.types.find((type) => type.id === selectedTypeId) || generated.types[0];
+  const selectedLegend = useMemo(
+    () => buildTypeCodeLegend(selectedType?.code, generated.logicAxes),
+    [generated.logicAxes, selectedType]
+  );
+  const selectedStats = useMemo(
+    () => buildCardStats(selectedType?.code, generated.logicAxes),
+    [generated.logicAxes, selectedType]
+  );
+
+  useEffect(() => {
+    setSelectedTypeId(generated.types[0]?.id || "");
+  }, [generated.types]);
+
+  const summaryTone = generationStatus === "failed"
+    ? "danger"
+    : generationStatus === "drafting" || generationStatus === "retrying"
+      ? "info"
+      : "success";
+  const summaryNote = generationStatus === "failed"
+    ? {
+        title: "结果卡补全暂时卡住了。",
+        body: `基础测试仍然可用。系统已经自动重试 ${retryCount} 次，你也可以手动再补一次。`
+      }
+    : generationStatus === "drafting" || generationStatus === "retrying"
+      ? getDraftingNote(generationStage, generated.config)
+      : {
+          title: "整套测试已经完整就绪。",
+          body: "题目、人格卡、分型维度和分享入口都已经连上，可以直接预览和传播。"
+        };
+
   return (
-    <main className="demo-page">
-      {navMeta ? (
-        <nav className="top-nav">
-          <button type="button" className="top-nav-link" onClick={() => { navigateTo(getBaseUrl()); window.location.reload(); }}>
-            发起测试
+    <section className="glass-panel ready-panel">
+      <div className="ready-hero">
+        <div>
+          <Pill tone="orange">测试已就绪</Pill>
+          <h2>你的「{generatedTestName}」已经铸造完成</h2>
+          <p>{getGeneratedSubcopy(generationStatus, generationStage, generated.config)}</p>
+        </div>
+        <div className="action-cluster">
+          <ActionButton kind="secondary" onClick={() => onOpenTest(generated.shareLink)}>预览测试</ActionButton>
+          <ActionButton kind="accent" onClick={() => onCopyLink(generated.shareLink)}>
+            {copyLabel === "复制测试入口" ? "分享测试" : copyLabel}
+          </ActionButton>
+          {generationStatus === "failed" ? (
+            <ActionButton kind="ghost" onClick={onRetry} disabled={isRetrying}>
+              {isRetrying ? "正在补全..." : "重新补全结果卡"}
+            </ActionButton>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="summary-strip">
+        <span>{generated.types.length} 张人格卡</span>
+        <span>{generated.questions.length} 道题</span>
+        <span>
+          {generationStatus === "ready"
+            ? "完整版已就绪"
+            : generationStatus === "failed"
+              ? "结果卡待补全"
+              : getDraftingSummaryLabel(generationStage)}
+        </span>
+      </div>
+
+      <div className={`inline-note ${summaryTone}`}>
+        <strong>{summaryNote.title}</strong>
+        <span>{summaryNote.body}</span>
+      </div>
+
+      <div className="share-link-card">
+        <div className="share-link-orb" />
+        <div>
+          <span className="micro-label">测试入口</span>
+          <strong>{generated.shareLink.replace(/^https?:\/\//, "")}</strong>
+          <p>任何人打开这个链接就能开始答题，结果页只展示结果，不回显作答过程和创建参数。</p>
+        </div>
+      </div>
+
+      <div className="tab-row">
+        {[
+          { id: "cards", label: `${generated.types.length} 张人格卡` },
+          { id: "questions", label: "题目预览" },
+          { id: "axes", label: "分型维度" }
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={`tab-button${tab === item.id ? " active" : ""}`}
+            onClick={() => setTab(item.id)}
+          >
+            {item.label}
           </button>
-          <span className="top-nav-meta">{navMeta}</span>
-        </nav>
-      ) : null}
+        ))}
+      </div>
 
-      {!hideHead && mode === "hero" ? (
-        <section className="hero simple-hero">
-          <div className="hero-grid hero-grid-simple">
-            <div>
-              <div className="eyebrow">{eyebrow}</div>
-              <h1>{title}</h1>
-              <p className="hero-copy">{description}</p>
-            </div>
-            <aside className="hero-stage hero-stage-simple">
-              <div className="step-card">
-                <span className="step-index">01</span>
-                <strong>选择元素</strong>
-                <p>先定主题，决定这套测试要让人记住什么。</p>
-              </div>
-              <div className="step-card">
-                <span className="step-index">02</span>
-                <strong>生成测试</strong>
-                <p>一键生成入口，立刻就能发给别人去玩。</p>
-              </div>
-              <div className="step-card">
-                <span className="step-index">03</span>
-                <strong>分享结果</strong>
-                <p>做完的人会拿到一张像话题名片一样的结果卡。</p>
-              </div>
-            </aside>
+      {tab === "cards" ? (
+        <div className="cards-preview-grid">
+          <div className="mini-grid">
+            {generated.types.map((type, index) => (
+              <MiniTypeCard
+                key={type.id}
+                type={type}
+                logicAxes={generated.logicAxes}
+                active={selectedType.id === type.id}
+                onClick={() => setSelectedTypeId(type.id)}
+                index={index}
+                total={generated.types.length}
+              />
+            ))}
           </div>
-        </section>
+
+          <aside className="detail-column">
+            <div className="detail-card-stage">
+              <PersonaCard
+                code={selectedType.code}
+                logicAxes={generated.logicAxes}
+                name={selectedType.name}
+                tagline={selectedType.tagline}
+                schoolLabel={generated.school.short}
+                rarity={buildRarity(selectedType.name)}
+                footerLeft={generatedTestName}
+                footerRight={selectedType.code}
+                glyph={getGlyphKind(selectedType.name)}
+                stats={selectedStats}
+                rotate={-2}
+                scale={0.92}
+              />
+            </div>
+
+            <div className="detail-copy">
+              <div className="detail-chip-row">
+                {selectedLegend.map((item) => (
+                  <span key={`${item.code}-${item.label}`}>
+                    <strong>{item.code}</strong>
+                    {item.label}
+                  </span>
+                ))}
+              </div>
+
+              <div className="detail-copy-block">
+                <span className="micro-label">一句话</span>
+                <p>{selectedType.tagline}</p>
+              </div>
+
+              <div className="detail-copy-block">
+                <span className="micro-label">怎么理解它</span>
+                <p>{selectedType.lens || selectedType.core}</p>
+              </div>
+
+              <div className="detail-copy-block">
+                <span className="micro-label">适合怎么写结果页</span>
+                <p>{selectedType.advice || selectedType.risk}</p>
+              </div>
+            </div>
+          </aside>
+        </div>
       ) : null}
 
-      {!hideHead && mode !== "hero" ? (
-        <section className="page-head">
-          <div className="eyebrow">{eyebrow}</div>
-          <h1>{title}</h1>
-          <p className="hero-copy">{description}</p>
-        </section>
+      {tab === "questions" ? (
+        <div className="question-preview-grid">
+          {generated.questions.map((question, index) => (
+            <article key={question.id} className="question-preview-card">
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <strong>{question.label}</strong>
+              <p>{question.axisLabel}</p>
+            </article>
+          ))}
+        </div>
       ) : null}
 
-      {children}
-    </main>
+      {tab === "axes" ? (
+        <div className="axes-tab">
+          <div className="axis-guide-grid">
+            {generated.logicAxes.map((axis) => (
+              <article key={axis.id} className="axis-guide-card">
+                <strong>{axis.label}</strong>
+                <div className="axis-guide-row">
+                  <div>
+                    <span>{axis.leftCode}</span>
+                    <b>{axis.left}</b>
+                    <p>{axis.leftDescription}</p>
+                  </div>
+                  <div>
+                    <span>{axis.rightCode}</span>
+                    <b>{axis.right}</b>
+                    <p>{axis.rightDescription}</p>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <AxisCodeGuide
+            logicAxes={generated.logicAxes}
+            title="字母缩写怎么读"
+            description="框架页和结果页都会同步展示这份说明，避免只剩字母黑话。"
+          />
+        </div>
+      ) : null}
+    </section>
   );
 }
 
-function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
-  const [isGenerated, setIsGenerated] = useState(false);
-  const [showLogic, setShowLogic] = useState(false);
+function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest, onGoHome }) {
   const [generatedConfig, setGeneratedConfig] = useState(null);
   const [generatedDemoId, setGeneratedDemoId] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -529,20 +999,22 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
   const [generationStage, setGenerationStage] = useState("");
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
+
   const generated = useMemo(
     () => buildGenerated(generatedConfig || config, getBaseUrl(), generatedDemoId ? { demoId: generatedDemoId } : {}),
     [config, generatedConfig, generatedDemoId]
   );
+  const builderPreview = useMemo(() => buildBuilderPreview(config), [config]);
   const draftTestName = useMemo(() => buildTestName(config), [config]);
   const generatedTestName = useMemo(() => buildTestName(generatedConfig || config), [config, generatedConfig]);
+  const copyLabel = copyState === "success" ? "已复制" : copyState === "error" ? "复制失败" : "复制测试入口";
+  const stage = generatedConfig || generatedDemoId ? "preview" : isGenerating ? "generating" : "builder";
 
   useEffect(() => {
-    document.title = buildDocumentTitle(isGenerated ? generatedTestName : "可分享人格测试生成器");
-  }, [generatedTestName, isGenerated]);
+    document.title = buildDocumentTitle(generatedConfig || generatedDemoId ? generatedTestName : "生成可分享人格测试");
+  }, [generatedConfig, generatedDemoId, generatedTestName]);
 
   useEffect(() => {
-    setIsGenerated(false);
-    setShowLogic(false);
     setGeneratedConfig(null);
     setGeneratedDemoId("");
     setGenerationError("");
@@ -553,7 +1025,7 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
   }, [config]);
 
   useEffect(() => {
-    if (!isGenerated || !generatedDemoId || generationStatus !== "drafting") return undefined;
+    if (!generatedDemoId || generationStatus !== "drafting") return undefined;
 
     let cancelled = false;
     const poll = async () => {
@@ -568,7 +1040,7 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
         }
       } catch {
         if (!cancelled) {
-          setGenerationError((current) => current || "结果卡补全时断了一下，稍后再刷新看看。");
+          setGenerationError((current) => current || "结果卡补全时断了一下，稍后刷新看看。");
         }
       }
     };
@@ -579,7 +1051,7 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [generatedDemoId, generationStatus, isGenerated]);
+  }, [generatedDemoId, generationStatus]);
 
   function updateConfig(nextPartial) {
     setConfig((current) => ({ ...current, ...nextPartial }));
@@ -592,8 +1064,6 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
       customDirection: ""
     }));
   }
-
-  const copyLabel = copyState === "success" ? "已复制" : copyState === "error" ? "复制失败" : "复制测试入口";
 
   async function runGeneration(sourceConfig, options = {}) {
     const { retrying = false } = options;
@@ -622,10 +1092,6 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
         setGenerationStatus("ready");
         setGenerationStage("ready");
       }
-
-      setIsGenerated(true);
-      setShowLogic(true);
-      setRetryCount(0);
     } catch (error) {
       setGenerationStatus("failed");
       setGenerationError(error.message || "生成失败，请稍后再试。");
@@ -653,237 +1119,307 @@ function BuilderPage({ config, setConfig, copyState, onCopyLink, onOpenTest }) {
       runGeneration(generatedConfig || config, { retrying: true });
     }, 1600);
 
-    return () => {
-      window.clearTimeout(timer);
-    };
+    return () => window.clearTimeout(timer);
   }, [config, generatedConfig, generationStatus, isGenerating, retryCount]);
 
-  useEffect(() => {
-    if (generationStatus !== "failed") return undefined;
-
-    if (generatedConfig || generatedDemoId) {
-      setIsGenerated(true);
-      setShowLogic(true);
-    }
-    return undefined;
-  }, [generatedConfig, generatedDemoId, generationStatus]);
-
   return (
-    <Shell
-      eyebrow="人格测试生成器"
-      title="生成一套适合被转发的人格测试。"
-      description="选一个你想要的主题，我们会把它变成一套有记忆点、有讨论度、也有分享冲动的测试。做完的人拿到的不是冷冰冰的结论，而是一句会让人想立刻转发出去的自我介绍。"
-      navMeta="选择内容 · 生成测试"
-    >
-      <section className="single-column top-gap">
-        <section className="panel builder-panel">
-          <div className="builder-header">
-            <div>
-              <h2>测试生成器</h2>
-              <p className="sub">先定主题，再生成入口。你要的不是一份说明书，而是一套别人做完会想讨论、想截图、想转发的测试。</p>
-            </div>
-          </div>
+    <div className="aurora-shell">
+      <CreatorTopbar stage={stage} onGoHome={onGoHome} />
 
-          <div className="section-title">心理流派</div>
-          <div className="card-grid">
-            {schools.map((school) => (
-              <OptionCard
-                key={school.id}
-                active={config.schoolId === school.id}
-                title={school.label}
-                description={school.pitch}
-                onClick={() => updateConfig({ schoolId: school.id })}
-              />
-            ))}
-          </div>
-
-          <div className="section-title">方向主题</div>
-          <div className="chip-row">
-            {directionCatalog.map((direction) => (
-              <DirectionChip
-                key={direction.id}
-                active={config.directionIds.includes(direction.id)}
-                label={direction.label}
-                onClick={() => selectDirection(direction.id)}
-              />
-            ))}
-          </div>
-
-          <div className="section-title">自定义方向</div>
-          <div className="field">
-            <label htmlFor="customDirection">方向主题单选；如果不用内置标签，可以自己输入一个</label>
-            <input
-              id="customDirection"
-              type="text"
-              value={config.customDirection}
-              placeholder="比如：播客、品牌咨询、脱口秀"
-              onChange={(event) => {
-                const nextValue = event.target.value;
-                updateConfig({
-                  customDirection: nextValue,
-                  directionIds: nextValue.trim()
-                    ? []
-                    : (config.directionIds.length ? config.directionIds.slice(0, 1) : ["work"])
-                });
-              }}
-            />
-          </div>
-
-          <div className="section-title">生成参数</div>
-          <div className="field-row">
-            <div className="field">
-              <label htmlFor="typeCount">人格类型数量</label>
-              <select
-                id="typeCount"
-                value={config.typeCount}
-                onChange={(event) => updateConfig({ typeCount: Number(event.target.value) })}
-              >
-                <option value={4}>4 种</option>
-                <option value={8}>8 种</option>
-                <option value={16}>16 种</option>
-                <option value={32}>32 种</option>
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="questionCount">题目数量</label>
-              <select
-                id="questionCount"
-                value={config.questionCount}
-                onChange={(event) => updateConfig({ questionCount: Number(event.target.value) })}
-              >
-                <option value={12}>12 题</option>
-                <option value={20}>20 题</option>
-                <option value={32}>32 题</option>
-                <option value={40}>40 题</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="actions top-gap">
-            <button type="button" className="primary" onClick={handleGenerate} disabled={isGenerating}>
-              {isGenerating ? "正在生成..." : "生成测试"}
-            </button>
-          </div>
-          {generationError ? <p className="error-note">{generationError}</p> : null}
+      <main className="page-shell">
+        <section className="hero-copy">
+          <Pill tone="violet">测试生成器 · beta</Pill>
+          <h1>把一个主题，变成一套会被转发的人格卡。</h1>
+          <p>
+            选一个主题和心理学流派，我们会把它生成成一套可以直接预览、分享和传播的人格测试。
+          </p>
         </section>
 
-        {isGenerating && (
-          <GenerationProgressCard
-            testName={draftTestName}
-            configLike={config}
-          />
-        )}
-
-        {isGenerated && (
-          <section className="panel generate-focus">
-            <div className="generate-focus-head compact">
+        <section className="builder-layout">
+          <section className="glass-panel builder-form">
+            <div className="section-head">
               <div>
-                <div className="system-badge">人格测试</div>
-                <h2>「{generatedTestName}」已经准备好了</h2>
-                <p className="sub">
-                  {getGeneratedSubcopy(generationStatus, generationStage, generatedConfig || config)}
-                </p>
+                <span className="micro-label">01 · 选择内容</span>
+                <h2>先把这套测试的语境定下来</h2>
               </div>
             </div>
 
-            <div className="generate-summary-row">
-              <span>{generated.types.length} 种人格</span>
-              <span>{generated.questions.length} 道题</span>
-              <span>{generationStatus === "drafting" ? getDraftingSummaryLabel(generationStage) : "完整版已就绪"}</span>
+            <div className="field-group">
+              <label>心理流派</label>
+              <div className="choice-grid">
+                {schools.map((school) => (
+                  <button
+                    key={school.id}
+                    type="button"
+                    className={`choice-card${config.schoolId === school.id ? " active" : ""}`}
+                    onClick={() => updateConfig({ schoolId: school.id })}
+                  >
+                    <strong>{school.label}</strong>
+                    <span>{school.pitch}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {generationStatus === "drafting" ? (
-              <div className="generation-inline-note">
-                <strong>{getDraftingNote(generationStage, generatedConfig || config).title}</strong>
-                <span>{getDraftingNote(generationStage, generatedConfig || config).body}</span>
+            <div className="field-group">
+              <label>方向主题</label>
+              <div className="chip-row">
+                {directionCatalog.map((direction) => (
+                  <button
+                    key={direction.id}
+                    type="button"
+                    className={`theme-chip${config.directionIds.includes(direction.id) ? " active" : ""}`}
+                    onClick={() => selectDirection(direction.id)}
+                  >
+                    {direction.label}
+                  </button>
+                ))}
               </div>
-            ) : null}
-
-            {generationStatus === "retrying" ? (
-              <div className="generation-inline-note">
-                <strong>结果卡补全刚刚断了一下，正在自动重试。</strong>
-                <span>不用重新填写参数，我们先帮你再补一轮；如果还是失败，你也可以手动再试一次。</span>
-              </div>
-            ) : null}
-
-            {generationStatus === "failed" ? (
-              <div className="generation-inline-note warning">
-                <strong>完整版结果卡暂时没有补全成功。</strong>
-                <span>基础测试仍然可用。我们已经自动重试 {retryCount} 次，你也可以手动再试一次。</span>
-              </div>
-            ) : null}
-
-            <div className="actions">
-              <button type="button" className="secondary" onClick={() => onOpenTest(generated.shareLink)}>预览测试</button>
-              <button type="button" className="primary" onClick={() => onCopyLink(generated.shareLink)}>{copyLabel === "复制测试入口" ? "分享测试" : copyLabel}</button>
-              {generationStatus === "failed" ? (
-                <button type="button" className="secondary" onClick={handleRetry} disabled={isGenerating || isRetrying}>
-                  {isGenerating || isRetrying ? "正在重试..." : "重新补全结果卡"}
-                </button>
-              ) : null}
-              <button type="button" className="ghost" onClick={() => setShowLogic((value) => !value)}>
-                {showLogic ? "收起生成结果" : "查看生成结果"}
-              </button>
             </div>
 
-            {showLogic && (
-              <section className="logic-panel top-gap">
-                <div className="logic-head">
-                  <h3>这是「{generatedTestName}」生成出来的结果框架</h3>
-                  <p>{generated.logicIntro}</p>
-                </div>
+            <div className="field-group">
+              <label htmlFor="customDirection">自定义主题</label>
+              <input
+                id="customDirection"
+                type="text"
+                value={config.customDirection}
+                placeholder="比如：播客、品牌咨询、脱口秀"
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  updateConfig({
+                    customDirection: nextValue,
+                    directionIds: nextValue.trim()
+                      ? []
+                      : (config.directionIds.length ? config.directionIds.slice(0, 1) : ["work"])
+                  });
+                }}
+              />
+            </div>
 
-                <div className="logic-axis-grid">
-                  {generated.logicAxes.map((axis) => (
-                    <article key={axis.id} className="logic-axis-card">
-                      <strong>{axis.label}</strong>
-                      <div className="logic-axis-sides">
-                        <div>
-                          <div className="axis-side-heading">
-                            {axis.leftCode ? <span className="axis-code-pill">{axis.leftCode}</span> : null}
-                            <span>{axis.left}</span>
-                          </div>
-                          <p>{axis.leftDescription}</p>
-                        </div>
-                        <div>
-                          <div className="axis-side-heading">
-                            {axis.rightCode ? <span className="axis-code-pill">{axis.rightCode}</span> : null}
-                            <span>{axis.right}</span>
-                          </div>
-                          <p>{axis.rightDescription}</p>
-                        </div>
-                      </div>
-                    </article>
+            <div className="parameter-grid">
+              <div className="parameter-card">
+                <label>人格卡数量</label>
+                <div className="segmented-row">
+                  {[4, 8, 16, 32].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      className={`segment-button${config.typeCount === count ? " active" : ""}`}
+                      onClick={() => updateConfig({ typeCount: count })}
+                    >
+                      {count}
+                    </button>
                   ))}
                 </div>
+              </div>
 
-                <div className="section-title">这套测试会产出的结果卡</div>
-                <div className="logic-type-grid">
-                  {generated.logicTypes.map((type) => (
-                    <article key={type.id} className="logic-type-card">
-                      {type.code ? <span className="type-code">{type.code}</span> : null}
-                      <strong>{type.name}</strong>
-                      <p>{type.tagline}</p>
-                      {type.lens ? <p className="logic-type-detail">{type.lens}</p> : null}
-                      {type.advice ? <p className="logic-type-note">{type.advice}</p> : null}
-                    </article>
+              <div className="parameter-card">
+                <label>题目数量</label>
+                <div className="segmented-row">
+                  {[12, 20, 32, 40].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      className={`segment-button${config.questionCount === count ? " active" : ""}`}
+                      onClick={() => updateConfig({ questionCount: count })}
+                    >
+                      {count}
+                    </button>
                   ))}
                 </div>
-              </section>
-            )}
+              </div>
+            </div>
+
+            <div className="builder-actions">
+              <ActionButton kind="accent" onClick={handleGenerate} disabled={isGenerating}>
+                {isGenerating ? "正在生成..." : "开始生成"}
+              </ActionButton>
+              <span>{formatExpectedLabel(getExpectedPreviewTimeMs(config))} 可预览版 · {formatExpectedLabel(getExpectedCompletionTimeMs(config))} 完整版</span>
+            </div>
+
+            {generationError && !generatedConfig ? (
+              <div className="inline-note danger">
+                <strong>生成时断了一下。</strong>
+                <span>{generationError}</span>
+              </div>
+            ) : null}
           </section>
-        )}
-      </section>
-    </Shell>
+
+          <aside className="builder-preview">
+            <span className="micro-label">// 预览：这套测试会长这样</span>
+            <PersonaCard
+              code={builderPreview.code}
+              name={builderPreview.name}
+              tagline={builderPreview.tagline}
+              schoolLabel={builderPreview.school}
+              rarity={builderPreview.rarity}
+              footerLeft={builderPreview.footerLeft}
+              footerRight={builderPreview.footerRight}
+              glyph={getGlyphKind(builderPreview.name)}
+              stats={buildCardStats(builderPreview.code)}
+              rotate={-4}
+              scale={0.98}
+            />
+          </aside>
+        </section>
+
+        {isGenerating ? (
+          <GenerationStudio testName={draftTestName} configLike={config} />
+        ) : null}
+
+        {generatedConfig || generatedDemoId ? (
+          <GeneratedHub
+            generated={generated}
+            generatedTestName={generatedTestName}
+            generationStatus={generationStatus}
+            generationStage={generationStage}
+            retryCount={retryCount}
+            copyLabel={copyLabel}
+            onCopyLink={onCopyLink}
+            onOpenTest={onOpenTest}
+            onRetry={handleRetry}
+            isRetrying={isRetrying || isGenerating}
+          />
+        ) : null}
+      </main>
+    </div>
   );
 }
 
-function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) {
+function StatusScene({ title, description, actionLabel, onAction, onGoHome }) {
+  return (
+    <div className="aurora-shell">
+      <TakerTopbar stage="test" progress={0} onGoHome={onGoHome} />
+      <main className="page-shell">
+        <section className="glass-panel status-panel">
+          <Pill tone="paper">加载状态</Pill>
+          <h1>{title}</h1>
+          <p>{description}</p>
+          {actionLabel && onAction ? (
+            <ActionButton kind="accent" onClick={onAction}>{actionLabel}</ActionButton>
+          ) : null}
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function ResultExperience({
+  payload,
+  shareHref,
+  copyState,
+  onCopyLink,
+  onSecondaryAction,
+  secondaryLabel,
+  onGoHome,
+  isPublic = false
+}) {
+  const shareLabel = copyState === "success" ? "已复制" : copyState === "error" ? "复制失败" : "分享结果";
+  const axisBreakdown = payload.axisBreakdown?.length
+    ? payload.axisBreakdown
+    : buildAxisBreakdownFromPayload(payload.type.code, payload.logicAxes || []);
+  const narrativeCards = [
+    payload.lens ? { title: "你给人的感觉", body: payload.lens } : null,
+    payload.advice ? { title: "你更适合的方式", body: payload.advice } : null,
+    payload.risk ? { title: "你容易卡住的点", body: payload.risk } : null,
+    payload.matchBody ? { title: payload.matchTitle || "更直白一点说", body: payload.matchBody } : null
+  ].filter(Boolean);
+  const codeLegend = buildTypeCodeLegend(payload.type.code, payload.logicAxes || []);
+  const cardStats = buildCardStats(payload.type.code, payload.logicAxes || []);
+  const secondaryTone = payload.secondary ? `你身上还带一点「${payload.secondary.name}」的气质。` : payload.footerLine;
+
+  return (
+    <div className="aurora-shell">
+      <TakerTopbar stage={isPublic ? "share" : "result"} progress={100} onGoHome={onGoHome} />
+      <main className="page-shell result-page-shell">
+        <section className="result-hero">
+          <Pill tone="orange">{isPublic ? "公开结果页" : "结果已生成"}</Pill>
+          <h1>{payload.viewerName && payload.viewerName !== "这位测试者" ? `${payload.viewerName} 是「${payload.type.name}」` : `你是「${payload.type.name}」`}</h1>
+          <p>{payload.summary}</p>
+          {secondaryTone ? <span className="result-footnote">{secondaryTone}</span> : null}
+        </section>
+
+        <section className="result-layout">
+          <div className="result-card-column">
+            <PersonaCard
+              code={payload.type.code}
+              logicAxes={payload.logicAxes || []}
+              name={payload.type.name}
+              tagline={payload.tagline || payload.summary}
+              schoolLabel={payload.testName}
+              rarity={buildRarity(payload.type.name)}
+              footerLeft={payload.testName}
+              footerRight={payload.type.code}
+              glyph={getGlyphKind(payload.type.name)}
+              stats={cardStats}
+              rotate={-3}
+              scale={1}
+            />
+            <div className="detail-chip-row">
+              {codeLegend.map((item) => (
+                <span key={`${item.code}-${item.label}`}>
+                  <strong>{item.code}</strong>
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="result-copy-column">
+            {narrativeCards.map((card, index) => (
+              <NarrativeCard key={card.title} index={index} title={card.title} body={card.body} />
+            ))}
+
+            <div className="action-cluster">
+              <ActionButton kind="accent" onClick={() => onCopyLink(shareHref)}>
+                {shareLabel}
+              </ActionButton>
+              {secondaryLabel && onSecondaryAction ? (
+                <ActionButton kind="secondary" onClick={onSecondaryAction}>{secondaryLabel}</ActionButton>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        <section className="glass-panel result-section">
+          <div className="section-head">
+            <div>
+              <span className="micro-label">字母拆解</span>
+              <h2>这张卡为什么是你</h2>
+            </div>
+          </div>
+          <div className="axis-breakdown-grid">
+            {axisBreakdown.map((axis) => (
+              <AxisSpectrumCard key={axis.id} axis={axis} />
+            ))}
+          </div>
+        </section>
+
+        <section className="glass-panel result-section">
+          <div className="section-head">
+            <div>
+              <span className="micro-label">像哪些人</span>
+              <h2>{payload.storyTitle || "你会让人想到谁"}</h2>
+            </div>
+          </div>
+          <div className="story-grid">
+            {(payload.examples || []).map((item) => (
+              <StoryCard key={item.name} item={item} />
+            ))}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink, onGoHome }) {
   const [config, setConfig] = useState(initialConfig);
   const [loadError, setLoadError] = useState("");
   const [isLoading, setIsLoading] = useState(Boolean(demoId && !initialConfig));
   const [participantName, setParticipantName] = useState("");
   const [answers, setAnswers] = useState({});
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showResult, setShowResult] = useState(false);
 
   useEffect(() => {
@@ -925,41 +1461,30 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
     [config, demoId]
   );
   const testName = useMemo(() => buildTestName(config), [config]);
-  const result = useMemo(() => (generated ? buildResult(generated, answers) : null), [generated, answers]);
+  const liveResult = useMemo(() => (generated ? buildResult(generated, answers) : null), [generated, answers]);
   const answeredCount = useMemo(
     () => (generated ? generated.questions.filter((question) => answers[question.id]).length : 0),
     [generated, answers]
   );
-  const progressPercent = generated
-    ? Math.round((answeredCount / Math.max(generated.questions.length, 1)) * 100)
-    : 0;
-  const primaryType = result?.primary?.type || null;
+  const totalQuestions = generated?.questions.length || 0;
+  const progressPercent = totalQuestions ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+  const currentQuestion = generated?.questions[currentQuestionIndex] || null;
+  const primaryType = liveResult?.primary?.type || null;
+  const axisBreakdown = useMemo(
+    () => (generated && liveResult && primaryType ? buildAxisBreakdown(generated, liveResult, primaryType) : []),
+    [generated, liveResult, primaryType]
+  );
   const narrative = useMemo(
-    () => (generated && result ? buildResultNarrative(generated, result, participantName.trim() || "这位测试者") : null),
-    [generated, result, participantName]
+    () => (generated && liveResult ? buildResultNarrative(generated, liveResult, participantName.trim() || "这位测试者") : null),
+    [generated, liveResult, participantName]
   );
-  const resultCodeLegend = useMemo(
-    () => (primaryType && generated ? buildTypeCodeLegend(primaryType.code, generated.logicAxes) : []),
-    [generated, primaryType]
-  );
-  const narrativeCards = useMemo(
-    () => {
-      if (!narrative) return [];
-      return [
-        narrative.lensBody ? { title: narrative.lensTitle, body: narrative.lensBody } : null,
-        narrative.adviceBody ? { title: narrative.adviceTitle, body: narrative.adviceBody } : null,
-        narrative.riskBody ? { title: narrative.riskTitle, body: narrative.riskBody } : null,
-        narrative.matchBody ? { title: narrative.matchTitle, body: narrative.matchBody } : null
-      ].filter(Boolean);
-    },
-    [narrative]
-  );
+
   const resultPayload = showResult && primaryType && narrative
     ? {
         viewerName: participantName.trim() || "这位测试者",
         testName,
         type: primaryType,
-        secondary: result.secondary?.type || null,
+        secondary: liveResult.secondary?.type || null,
         headline: narrative.heading,
         summary: narrative.wittySummary,
         tagline: primaryType.tagline,
@@ -971,11 +1496,11 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
         storyTitle: narrative.storyTitle,
         examples: narrative.examples,
         footerLine: narrative.footerLine,
-        logicAxes: generated.logicAxes
+        logicAxes: generated.logicAxes,
+        axisBreakdown
       }
     : null;
   const resultShareLink = resultPayload ? `${getBaseUrl()}?result=${safeEncode(resultPayload)}` : "";
-  const copyLabel = copyState === "success" ? "已复制" : copyState === "error" ? "复制失败" : "复制结果页";
 
   useEffect(() => {
     if (isLoading) {
@@ -984,7 +1509,7 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
     }
 
     if (loadError || !config) {
-      document.title = buildDocumentTitle(`「${testName}」暂时打不开`);
+      document.title = buildDocumentTitle(`「${testName || "人格测试"}」暂时打不开`);
       return;
     }
 
@@ -996,85 +1521,140 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
     document.title = buildDocumentTitle(`开始做「${testName}」`);
   }, [config, demoId, initialConfig, isLoading, loadError, primaryType, showResult, testName]);
 
+  useEffect(() => {
+    setCurrentQuestionIndex(0);
+    setAnswers({});
+    setShowResult(false);
+  }, [config]);
+
   if (isLoading) {
     return (
-      <Shell
-        eyebrow="人格测试"
+      <StatusScene
         title={`正在加载「${demoId ? "这套人格测试" : buildTestName(initialConfig)}」`}
-        description="马上就好，我们正在把这套结果卡对应的题目和类型取回来。"
-        mode="compact"
-        navMeta={null}
-      >
-        <section className="single-column top-gap">
-          <section className="panel">
-            <p className="sub">正在准备题目...</p>
-          </section>
-        </section>
-      </Shell>
+        description="题目、人格卡和结果框架正在从线上拉回本地界面。"
+        onGoHome={onGoHome}
+      />
     );
   }
 
-  if (!config || loadError) {
+  if (!config || loadError || !generated) {
     return (
-      <Shell
-        eyebrow="人格测试"
-        title={`「${testName}」暂时打不开。`}
-        description={loadError || "链接可能已经失效，或者这套测试还没准备完整。"}
-        mode="compact"
-        navMeta={null}
-      >
-        <section className="single-column top-gap">
-          <section className="panel">
-            <p className="sub">{loadError || "请返回重新生成一套测试。"}</p>
-          </section>
-        </section>
-      </Shell>
+      <StatusScene
+        title={`「${testName || "人格测试"}」暂时打不开`}
+        description={loadError || "链接可能已失效，或者这套测试还没准备完整。"}
+        actionLabel="返回发起页"
+        onAction={onGoHome}
+        onGoHome={onGoHome}
+      />
     );
   }
 
   function handleAnswer(questionId, value) {
     setShowResult(false);
     setAnswers((current) => ({ ...current, [questionId]: value }));
+    if (currentQuestionIndex < totalQuestions - 1) {
+      window.setTimeout(() => {
+        setCurrentQuestionIndex((current) => Math.min(current + 1, totalQuestions - 1));
+      }, 120);
+    }
   }
 
   function revealResult() {
-    if (answeredCount !== generated.questions.length) {
-      window.alert(`还有 ${generated.questions.length - answeredCount} 道题没答完，先补齐再看结果。`);
+    if (answeredCount !== totalQuestions) {
+      window.alert(`还有 ${totalQuestions - answeredCount} 道题没答完，先补齐再看结果。`);
       return;
     }
     setShowResult(true);
   }
 
+  const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
+  const currentAnswered = currentQuestion ? Boolean(answers[currentQuestion.id]) : false;
+
+  if (showResult && resultPayload) {
+    return (
+      <ResultExperience
+        payload={resultPayload}
+        shareHref={resultShareLink}
+        copyState={copyState}
+        onCopyLink={onCopyLink}
+        onSecondaryAction={() => setShowResult(false)}
+        secondaryLabel="回看题目"
+        onGoHome={onGoHome}
+      />
+    );
+  }
+
   return (
-    <Shell
-      eyebrow="人格测试"
-      title={`开始做「${testName}」`}
-      description="你只需要专注回答这些陈述。完成之后，系统会基于人格维度结果生成一张适合分享的结果卡。"
-      mode="compact"
-      navMeta={null}
-    >
-      <section className="single-column top-gap test-layout">
-        <section className="panel test-panel">
-          <div className="title-wrap">
-              <div>
-                <div className="system-badge">开始测试</div>
-                <h2>开始做「{testName}」</h2>
-                <p className="sub">按照“像不像你”的程度作答即可。</p>
-              </div>
+    <div className="aurora-shell">
+      <TakerTopbar stage="test" progress={progressPercent} onGoHome={onGoHome} />
+
+      <main className="page-shell">
+        <section className="test-layout">
+          <section className="glass-panel question-panel">
+            <div className="question-panel-head">
+              <Pill tone="paper">Q {String(currentQuestionIndex + 1).padStart(2, "0")} / {String(totalQuestions).padStart(2, "0")}</Pill>
+              <span>{progressPercent}% 已完成</span>
             </div>
 
-          <div className="progress-card">
-            <div className="progress-meta">
-              <strong>答题进度</strong>
-              <span>{answeredCount} / {generated.questions.length} 题</span>
-            </div>
-            <div className="progress-bar">
-              <i style={{ width: `${progressPercent}%` }} />
-            </div>
-          </div>
+            <h1>{currentQuestion?.label}</h1>
+            <p>按直觉回答就好，不需要思考“标准答案”。这套结果会更偏向你真实的反应方式，而不是理想中的自己。</p>
 
-          <div className="field-row">
-            <div className="field">
+            <div className="scale-grid">
+              {scaleLabels.map((scale) => (
+                <button
+                  key={scale.value}
+                  type="button"
+                  className={`scale-option${answers[currentQuestion.id] === scale.value ? " active" : ""}`}
+                  onClick={() => handleAnswer(currentQuestion.id, scale.value)}
+                >
+                  <strong>{scale.short}</strong>
+                  <span>{scale.text}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="question-nav">
+              <ActionButton
+                kind="ghost"
+                onClick={() => setCurrentQuestionIndex((current) => Math.max(0, current - 1))}
+                disabled={currentQuestionIndex === 0}
+              >
+                上一题
+              </ActionButton>
+              {isLastQuestion ? (
+                <ActionButton
+                  kind="accent"
+                  onClick={revealResult}
+                  disabled={!currentAnswered}
+                >
+                  提交并查看结果
+                </ActionButton>
+              ) : (
+                <ActionButton
+                  kind="secondary"
+                  onClick={() => setCurrentQuestionIndex((current) => Math.min(totalQuestions - 1, current + 1))}
+                  disabled={currentQuestionIndex === totalQuestions - 1}
+                >
+                  下一题
+                </ActionButton>
+              )}
+            </div>
+
+            <div className="question-dots">
+              {generated.questions.map((question, index) => (
+                <button
+                  key={question.id}
+                  type="button"
+                  className={`question-dot${index === currentQuestionIndex ? " current" : ""}${answers[question.id] ? " answered" : ""}`}
+                  onClick={() => setCurrentQuestionIndex(index)}
+                  aria-label={`第 ${index + 1} 题`}
+                />
+              ))}
+            </div>
+          </section>
+
+          <aside className="glass-panel test-side-panel">
+            <div className="field-group compact">
               <label htmlFor="participantName">你的名字或昵称</label>
               <input
                 id="participantName"
@@ -1084,156 +1664,58 @@ function TestPage({ initialConfig = null, demoId = "", copyState, onCopyLink }) 
                 onChange={(event) => setParticipantName(event.target.value)}
               />
             </div>
-            <div className="field">
-              <label>答题说明</label>
-              <div className="helper">请按直觉回答。1 分表示很不像，5 分表示非常像。</div>
+
+            <div className="test-side-copy">
+              <span className="micro-label">答题进度</span>
+              <strong>{answeredCount} / {totalQuestions} 已完成</strong>
+              <p>{isLastQuestion ? "这是最后一题。选完后直接点提交，就会生成你的结果卡。" : "按直觉作答就好，答完后会一次性生成结果卡。"}</p>
             </div>
-          </div>
 
-          <div className="answer-list">
-            {generated.questions.map((question, index) => (
-              <AnswerQuestionCard
-                key={question.id}
-                question={question}
-                index={index}
-                value={answers[question.id]}
-                onAnswer={handleAnswer}
-              />
-            ))}
-          </div>
-
-          <div className="actions">
-            <button type="button" className="primary" onClick={revealResult}>提交结果，获得答案</button>
-          </div>
+            <div className="test-cta">
+              <strong>{isLastQuestion ? "最后一步" : `第 ${currentQuestionIndex + 1} / ${totalQuestions} 题`}</strong>
+              <p>全部答完后会直接生成一张可分享的结果卡。公开页不会暴露你的作答过程。</p>
+              {isLastQuestion ? (
+                <ActionButton kind="accent" onClick={revealResult} disabled={!currentAnswered}>
+                  提交并查看结果
+                </ActionButton>
+              ) : (
+                <ActionButton
+                  kind="secondary"
+                  onClick={() => setCurrentQuestionIndex((current) => Math.min(totalQuestions - 1, current + 1))}
+                >
+                  继续答题
+                </ActionButton>
+              )}
+            </div>
+          </aside>
         </section>
-
-        {showResult && (
-          <section className="panel top-gap">
-            <div className="title-wrap">
-              <div>
-                <div className="system-badge">测试结果</div>
-                <h2>{participantName.trim() ? `${participantName.trim()}，你的「${testName}」结果已经生成了` : `你的「${testName}」结果已经生成了`}</h2>
-                <p className="sub">这张结果卡更适合被分享。页面不会展示你的作答过程。</p>
-              </div>
-            </div>
-
-            <ShareBanner
-              name={primaryType.name}
-              tagline={`${narrative.wittySummary}${narrative.footerLine ? ` ${narrative.footerLine}` : ""}`}
-              code={primaryType.code}
-              codeLegend={resultCodeLegend}
-            />
-
-            <AxisCodeGuide
-              logicAxes={generated.logicAxes}
-              title="结果字母怎么读"
-              description="每个缩写都对应你在这套测试里更偏向的一侧，分享时别人也能一眼看懂。"
-            />
-
-            {narrativeCards.length ? (
-              <div className="answer-grid top-gap">
-                {narrativeCards.map((item) => (
-                  <div key={item.title} className="result-card">
-                    <h3>{item.title}</h3>
-                    <p>{item.body}</p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            <section className="top-gap">
-              <div className="section-title">{narrative.storyTitle}</div>
-              <div className="story-grid">
-                {narrative.examples.map((item) => (
-                  <StoryCard key={item.name} item={item} />
-                ))}
-              </div>
-            </section>
-            <div className="actions top-gap">
-              <button type="button" className="primary" onClick={() => onCopyLink(resultShareLink)}>{copyLabel === "复制结果页" ? "分享结果" : copyLabel}</button>
-            </div>
-          </section>
-        )}
-      </section>
-    </Shell>
+      </main>
+    </div>
   );
 }
 
-function PublicResultPage({ payload, currentHref, copyState, onCopyLink }) {
-  const shareLabel = copyState === "success" ? "已复制" : copyState === "error" ? "复制失败" : "分享结果";
-  const viewerName = payload.viewerName && payload.viewerName !== "这位测试者" ? payload.viewerName : "";
-  const publicTestName = payload.testName || "人格测试";
-  const resultHeadline = viewerName ? `${viewerName} 的「${publicTestName}」结果` : payload.headline;
-  const publicCodeLegend = buildTypeCodeLegend(payload.type.code, payload.logicAxes || []);
-  const publicNarrativeCards = [
-    payload.lens ? { title: "你给人的感觉", body: payload.lens } : null,
-    payload.advice ? { title: "你更适合的方式", body: payload.advice } : null,
-    payload.risk ? { title: "这类人格的盲点", body: payload.risk } : null,
-    payload.matchBody ? { title: payload.matchTitle || "更直白一点说", body: payload.matchBody } : null
-  ].filter(Boolean);
+function schoolLabelForTerminal(configLike) {
+  const school = schools.find((item) => item.id === configLike?.schoolId) || schools[0];
+  return `${school.short} · ${resolveDirectionLabel(configLike)}`;
+}
 
+function PublicResultPage({ payload, currentHref, copyState, onCopyLink, onGoHome }) {
   useEffect(() => {
-    document.title = buildDocumentTitle(viewerName ? `${viewerName} 的「${publicTestName}」结果卡` : `「${publicTestName}」结果卡`);
-  }, [publicTestName, viewerName]);
+    const viewerName = payload.viewerName && payload.viewerName !== "这位测试者" ? payload.viewerName : "";
+    document.title = buildDocumentTitle(viewerName ? `${viewerName} 的结果卡` : `${payload.testName || "人格测试"}结果卡`);
+  }, [payload]);
 
   return (
-    <Shell
-      eyebrow="人格测试结果"
-      title={`这是一张「${publicTestName}」的结果卡。`}
-      description="这里不会展示作答过程，只保留结果本身。看完之后，也可以继续生成自己的测试。"
-      mode="compact"
-      navMeta={null}
-      hideHead
-    >
-      <section className="single-column top-gap">
-        <section className="panel">
-          <div className="title-wrap">
-            <div>
-              <div className="system-badge">分享结果</div>
-              <h2>{resultHeadline}</h2>
-              {viewerName ? <p className="sub">{viewerName} 做完「{publicTestName}」后，拿到的是这张结果卡。</p> : null}
-              <p className="sub">适合直接截图、转发、继续扩散。</p>
-            </div>
-          </div>
-
-          <ShareBanner
-            name={payload.type.name}
-            tagline={`${payload.summary}${payload.footerLine ? ` ${payload.footerLine}` : ""}`}
-            code={payload.type.code}
-            codeLegend={publicCodeLegend}
-          />
-
-          <AxisCodeGuide
-            logicAxes={payload.logicAxes || []}
-            title="结果字母怎么读"
-            description="这张结果卡里的每个字母，都对应这套测试的一条判断维度。"
-          />
-
-          {publicNarrativeCards.length ? (
-            <div className="answer-grid top-gap">
-              {publicNarrativeCards.map((item) => (
-                <div key={item.title} className="result-card">
-                  <h3>{item.title}</h3>
-                  <p>{item.body}</p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          <section className="top-gap">
-            <div className="section-title">{payload.storyTitle || "这类人会让你想到谁"}</div>
-            <div className="story-grid">
-              {(payload.examples || []).map((item) => (
-                <StoryCard key={item.name} item={item} />
-              ))}
-            </div>
-          </section>
-          <div className="actions top-gap">
-            <button type="button" className="primary" onClick={() => onCopyLink(currentHref)}>{shareLabel}</button>
-          </div>
-        </section>
-      </section>
-    </Shell>
+    <ResultExperience
+      payload={payload}
+      shareHref={currentHref}
+      copyState={copyState}
+      onCopyLink={onCopyLink}
+      onSecondaryAction={onGoHome}
+      secondaryLabel="我也生成一套"
+      onGoHome={onGoHome}
+      isPublic
+    />
   );
 }
 
@@ -1265,8 +1747,21 @@ export default function App() {
     setCurrentHref(window.location.href);
   }
 
+  function goHome() {
+    navigateTo(getBaseUrl(), true);
+    setCurrentHref(window.location.href);
+  }
+
   if (route.view === "public-result") {
-    return <PublicResultPage payload={route.payload} currentHref={currentHref} copyState={copyState} onCopyLink={copyLink} />;
+    return (
+      <PublicResultPage
+        payload={route.payload}
+        currentHref={currentHref}
+        copyState={copyState}
+        onCopyLink={copyLink}
+        onGoHome={goHome}
+      />
+    );
   }
 
   if (route.view === "test") {
@@ -1276,6 +1771,7 @@ export default function App() {
         demoId={route.demoId || ""}
         copyState={copyState}
         onCopyLink={copyLink}
+        onGoHome={goHome}
       />
     );
   }
@@ -1287,6 +1783,7 @@ export default function App() {
       copyState={copyState}
       onCopyLink={copyLink}
       onOpenTest={openUrl}
+      onGoHome={goHome}
     />
   );
 }
