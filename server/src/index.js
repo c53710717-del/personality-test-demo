@@ -24,7 +24,10 @@ const { Pool } = pg;
 const pool = DATABASE_URL
   ? new Pool({
       connectionString: DATABASE_URL,
-      ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false }
+      ssl: DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
+      connectionTimeoutMillis: 5000,
+      query_timeout: 10000,
+      statement_timeout: 10000
     })
   : null;
 let canUseDatabase = Boolean(pool);
